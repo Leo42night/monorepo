@@ -200,6 +200,18 @@ docker compose logs -f backend
 # jika proses di Killed (RAM Habis) bisa coba Tambah Swap Space
 # Jika ada update, jalankan ulang shortcut up build:
 docker compose up --build -d
+
+# Jika masih error kode yang tidak berubah, Jalankan pembersihan "nuklir" 
+## 1. Matikan kontainer
+docker compose down
+## 2. Hapus cache build secara total (Sangat Penting!)
+docker builder prune -a -f
+## 3. Bangun ulang tanpa cache sama sekali (asumsi jika error perubahan kode di `backend`)
+docker compose build --no-cache backend
+docker compose build --no-cache frontend
+## 4. Jalankan
+docker compose up backend
+docker compose up frontend
 ```
 
 Akses:
