@@ -121,6 +121,8 @@ sudo dnf install -y git
 git clone git@github.com:<username>/mono-docker.git
 cd mono-docker
 ```
+Jika ingin melakukan beberapa perubahan file. ubah saja di local, push ke repo. lalu di EC2 pull. terutama:
+- Fetch di frontend App2.tsx gunakan VITE_BACKEND_URL seperti di tutorial `Monorepo-4.md -> B. Apps/Frontend`
 
 ### Step 4: Buat file `.env` untuk secrets
 
