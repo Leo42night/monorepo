@@ -58,6 +58,8 @@ di halaman AWS Console EC2 `Instances`, Buka instance, lalu Klik tombo `Connect`
 /Downloads$ cp key.pem ~   
 # masuk ke ~ (home)
 cd ~
+# protected pem
+chmod 400 key.pem
 
 # paste `Example` di halaman aws -> Instance -> Connect -> SSH Client, 
 # contoh (`ec2-user` adalah username default untuk Amazon Linux):
