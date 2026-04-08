@@ -32,7 +32,7 @@ Selesaikan Lebih dulu:
 
 ### Step 1: Buat EC2 Instance
 
-Di AWS Console, search halaman `Instances` (EC2 Feature), lalu klik `Launce Instances`:
+Di AWS Console, search halaman `EC2 Instances` (EC2 Feature), lalu klik `Launce Instances`:
 - **Name**: Nama User
 - **AMI** (Default): `Amazon Linux 2023`
 - **Instance type**: pilih `t3.small` (minimal 2GB Memory RAM)
