@@ -183,11 +183,6 @@ docker compose logs -f backend
 
 # jika bermasalah build, selalu coba untuk ikut cara di monorepo-docker.md
 # bisa coba build backend terlebih dahulu, lalu frontend
-# jika proses di Killed (RAM Habis) bisa coba Tambah Swap Space
-# Jika ada update, jalankan ulang shortcut up build:
-docker compose up --build -d
-
-# Jika masih error kode yang tidak berubah, Jalankan pembersihan "nuklir" 
 ## 1. Matikan kontainer
 docker compose down
 ## 2. Hapus cache build secara total (Sangat Penting!)
