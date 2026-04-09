@@ -1,7 +1,7 @@
 # Mono Docker EC2 AWS 
 
 ## A. Setup Wallet & Billing
-Bisa ikuti tutorial di sini untuk [Setup Kartu Debit/Kredit dan koneksi Billing ke AWS](https://docs.google.com/document/d/1EEtbymKJmg64SjbYX8Qzg4_JhZR_KcImVMgPmti24aE/edit?usp=sharing)
+Untuk admin AWS: Bisa ikuti tutorial di sini untuk [Setup Kartu Debit/Kredit dan koneksi Billing ke AWS](https://docs.google.com/document/d/1EEtbymKJmg64SjbYX8Qzg4_JhZR_KcImVMgPmti24aE/edit?usp=sharing). Admin dapat beri akses akun IAM ke tim nya untuk akses layanan EC2 AWS.
 
 ## B. EC2 + Docker Compose
 Jalankan `docker compose up` langsung di EC2, persis seperti di lokal.
