@@ -31,7 +31,9 @@ Di AWS Console, search halaman `EC2` -> `Instances` (EC2 Feature), lalu klik `La
 | 3000 | Backend API | Custom TCP | Anywhere 0.0.0.0/0 |
 
 - Finally: klik `Launce Instance`
-- Jika sudah di launch, Klik nama instance (tampil detail instance)-> Klik `Connect` -> Klik tab `SSH Client` (ikut & salin command koneksi SSH).
+- Jika sudah di launch, Klik nama instance (tampil detail instance)-> Klik `Connect` ->
+   - Di tab `EC2 Instance Connect` salin `Public IPv4 address`  
+   - Klik tab `SSH Client` (salin `Example` koneksi SSH: cth **ssh -i "user-1.pem"...**).
 
 ### Step 2: Install Docker di EC2
 di halaman AWS Console EC2 `Instances`, Buka instance, lalu Klik tombo `Connect` untuk dapat command connect SSH.
