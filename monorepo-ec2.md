@@ -96,10 +96,11 @@ ssh-keygen -t ed25519 -C "your_github_email@gmail.com"
 ## 3. Add Your SSH Key to GitHub 
 cat ~/.ssh/id_ed25519.pub
 ## -> Copy the key
-## -> In GitHub: go to Settings > `SSH and GPG keys`
-## Add Key: Click New SSH key, give it a title (e.g., "Work Laptop"), and paste your key into the field.
+## -> In GitHub: klik profile User (di kanan atas) -> klik `Settings` -> `SSH and GPG keys`
+## Add Key: Click New SSH key, give it a title (e.g., "aws user"), and paste your key into the field.
 ## 4. Test the Connection
 ssh -T git@github.com
+## -> klik `yes`
 
 # Amazon Linux SSH Login
 sudo dnf install -y git
