@@ -179,7 +179,7 @@ docker compose logs -f backend
 # tekan ctrl+c untuk terminate log dan tampilkan kembali command line
 docker compose logs -f frontend
 
-# jika ada perubahan, bisa lakukan build dan langsung up
+# jika ada perubahan, bisa down dulu lalu lakukan up prefix build
 docker compose down
 docker compose up --build
 
