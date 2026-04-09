@@ -1,26 +1,7 @@
 # Mono Docker EC2 AWS 
 
 ## A. Setup Wallet & Billing
-Bagi yang ingin pakai rekening Bank Konvensional (Mandiri, BCA, dsb.), langsung ke step-2, pastikan kartu sudah mendukung transaksi internasional atau terkoneksi Visa.
-
-### 1. Buat Kartu Jago
-- Download Aplikasi Jago. 
-- Login: masukkan data diri & alamat yang sesuai dengan KTP dan akun akun google (pribadi, jangan pakai akun UNTAN).
-- Buat "Kartu Debit Digital" Visa Bank Jago, jadikan `kantong utama`.
-- Pastikan alamat rumah konsisten untuk akun bank Jago dan akun google.
-
-### 2. Verifikasi Kartu
-- Verifikasi nomor dengan [Credit Card Validator](https://dnschecker.org/credit-card-validator.php).
-
-### 3. Koneksi Billing
-Tutorial koneksi kartu ke AWS Free Tier:
-- [Cara Daftar Akun AWS Free Tier 2025](https://www.youtube.com/watch?v=NB7F8RaCY1o)
-
-Tutorial Koneksi kartu ke GCP Free Trial:
-- Verifikasi kartu visa dapat digunakan dengan koneksi ke e-wallet google. 
-- Pastikan saldo min. `Rp50k` untuk `Tagihan Sementara` untuk google dapat verifikasi kartu. Saldo akan dikembalikan setelah verifikasi berhasil (paling lama 7 hari kerja).
-- Setelah rekening terkoneksi ke e wallet, pendaftarkan ke GCP 300$ free trial akan lebih mudah.
-- Verifikasi Google Cloud Billing buntuh min. saldo `Rp150k`, data dapat di refund seletah verifikasi berhasil. 
+Bisa ikuti tutorial di sini untuk [Setup Kartu Debit/Kredit dan koneksi Billing ke AWS](https://docs.google.com/document/d/1EEtbymKJmg64SjbYX8Qzg4_JhZR_KcImVMgPmti24aE/edit?usp=sharing)
 
 ## B. EC2 + Docker Compose
 Jalankan `docker compose up` langsung di EC2, persis seperti di lokal.
