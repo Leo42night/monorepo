@@ -38,15 +38,11 @@ Di AWS Console, search halaman `EC2` -> `Instances` (EC2 Feature), lalu klik `La
 ### Step 2: Install Docker di EC2
 di halaman AWS Console EC2 `Instances`, Buka instance, lalu Klik tombo `Connect` untuk dapat command connect SSH.
 ```bash
-# (di wsl) copy file `key.pem` (di downloads/ windows) ke ~ (home linux)
-# contoh:
-/Downloads$ cp key.pem ~   
-# masuk ke ~ (home)
-cd ~
-# protected pem
+# di linux atau mac: jalankan dulu protected pem (wajib sebelum koneksi SSH).
 chmod 400 key.pem
+# di windows: kalian bisa langsung buka cmd di halaman file `*.pem` kalian.
 
-# paste `Example` di halaman aws -> Instance -> Connect -> SSH Client, 
+# paste `Example` di halaman aws -> Instance -> Connect -> SSH Client.
 # contoh (`ec2-user` adalah username default untuk Amazon Linux):
 ssh -i "key.pem" ec2-user@ec2-44-xx-xx-xx.compute-1.amazonaws.com
 # 🚨🚨 Anda akan sering run command ini, karena SSH akan sering disconnect
