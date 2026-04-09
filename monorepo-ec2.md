@@ -13,13 +13,15 @@ Selesaikan Lebih dulu:
 
 ### Step 1: Buat EC2 Instance
 
-Di AWS Console, search halaman `EC2 Instances` (EC2 Feature), lalu klik `Launce Instances`:
-- **Name**: Nama User
+Di AWS Console, search halaman `EC2` -> `Instances` (EC2 Feature), lalu klik `Launce Instances`:
+- **Name**: Nama User (cth: `user-1`)
 - **AMI** (Default): `Amazon Linux 2023`
 - **Instance type**: pilih `t3.small` (minimal 2GB Memory RAM)
-- Buat atau pilih **Key Pair** (`key.pem`), simpan baik-baik. nama Key Pair = Nama User
+- Buat atau pilih **Key Pair** (`key.pem`), simpan baik-baik. nama Key Pair = Nama User (cth: `user-1`)
 - **Network Setting**: Allow SSH & HTTP.
-  - Klik `Edit`. Pastikan **Inbound Security Group** — buka port ini:
+  - Klik `Edit`. Pastikan **Inbound Security Group**
+  - **Security group name** berikan postfix nama user (cth: `launch-wizard-12-user-1`)
+  - buka port ini:
 
 | Port | Tujuan      | TYPE       | Source             | 
 |------|-------------|------------|--------------------|
