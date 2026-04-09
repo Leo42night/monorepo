@@ -184,6 +184,7 @@ docker compose logs -f backend
 docker compose logs -f frontend
 
 # jika ada perubahan, bisa lakukan build dan langsung up
+docker compose down
 docker compose up --build
 
 # referensi perbaikan docker ada di monorepo-docker.md
