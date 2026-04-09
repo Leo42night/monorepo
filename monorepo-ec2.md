@@ -91,7 +91,7 @@ newgrp docker
 ls -al ~/.ssh
 ## If ada id_ed25519.pub or id_rsa.pub, you can skip to Step 3
 ## 2. Generate a New SSH Key 
-ssh-keygen -t ed25519 -C "your_github_email@example.com"
+ssh-keygen -t ed25519 -C "your_github_email@gmail.com"
 ## Ketik enter saja terus (biarkan default)
 ## 3. Add Your SSH Key to GitHub 
 cat ~/.ssh/id_ed25519.pub
