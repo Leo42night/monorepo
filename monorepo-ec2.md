@@ -188,7 +188,7 @@ docker compose up --build
 
 Akses:
 - Frontend: `http://your-ec2-public-ipv4:5173`
-   - Lihat root `/` apakah tampil data users dan backend.
+   - Lihat root `/` apakah tampil data users dan backend. (path `/classroom` gk dulu, memang perlu setingan lanjutan)
 - Backend: `http://your-ec2-public-ipv4:3000`
    - Test periksa path `/users`.
 
