@@ -180,19 +180,13 @@ Cek status:
 ```bash
 docker compose ps
 docker compose logs -f backend
+# tekan ctrl+c untuk terminate log dan tampilkan kembali command line
+docker compose logs -f frontend
 
-# jika bermasalah build, selalu coba untuk ikut cara di monorepo-docker.md
-# bisa coba build backend terlebih dahulu, lalu frontend
-## 1. Matikan kontainer
-docker compose down
-## 2. Hapus cache build secara total (Sangat Penting!)
-docker builder prune -a -f
-## 3. Bangun ulang tanpa cache sama sekali (asumsi jika error perubahan kode di `backend`)
-docker compose build --no-cache backend
-docker compose build --no-cache frontend
-## 4. Jalankan
-docker compose up backend
-docker compose up frontend
+# jika ada perubahan, bisa lakukan build dan langsung up
+docker compose up --build
+
+# referensi perbaikan docker ada di monorepo-docker.md
 ```
 
 Akses:
