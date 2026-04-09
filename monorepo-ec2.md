@@ -201,7 +201,9 @@ Kumpulkan:
 
 Lihat juga [Bebera SS Proses Setup](https://drive.google.com/drive/folders/1PDZXk2cN-5ieJyH_3CSojy8jU4HPdBD0?usp=drive_link) untuk memmbantu beri gambaran setingan yang tepat.
 
+[Video Tutorial Buat Instance, Setup EC2 Docker & Push kode dari EC2 ke Repo](https://drive.google.com/file/d/1Km4m2t5PpdiTwq44euX-Yul3YQEVCmLq/view?usp=drive_link)
+
 --- 
 
 ## Alert
-Fitur Google Auth tidak dapat redirect ke ip `http://` jika pakai public ip, jadi perlu setup domain. Tutorial saat ini belum sampai ke situ.
+Fitur Google Auth tidak dapat redirect ke ip `http://` jika pakai public ip, jadi perlu setup domain. Tutorial saat ini belum sampai ke situ. Jadi fitur `/classroom` memang belum dapat diakses.
