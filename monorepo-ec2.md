@@ -9,7 +9,7 @@ Jalankan `docker compose up` langsung di EC2, persis seperti di lokal.
 ### Step 0: Prerequisite
 Selesaikan Lebih dulu:
 - Setup docker di `monorepo-docker.md` 
-- Setup Environement production seperti Turso Database & src/index.ts di `monorepo-4.md` 
+- Setup Environement production seperti Turso Database, src/index.ts, & di Frontend `*.tsx` & `vite.config.ts` di `monorepo-4.md` (Menggunakan value Environment Variable, bukan sekadar http://localhost) 
 
 ### Step 1: Buat EC2 Instance
 
