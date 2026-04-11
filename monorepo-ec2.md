@@ -194,10 +194,10 @@ Akses:
 
 ## C. Final
 Kumpulkan:
-1. **Link**: 
-   - Repo **`https://github.com/<username>/ppwl10-ec2`**
-   - Frontend & Backend
-2. **1 Gambar ScreenShot**: Terminal Docker Jalan dengan latar belakang halaman web backend route users. Full Screen. [Contoh Submisi](https://drive.google.com/file/d/10R7xLgCjEVcQhzm9E1Pma52mgEzTsJJh/view?usp=drive_link)
+1. **Link** Repo **`https://github.com/<username>/ppwl10-ec2`**
+2. **Link** Frontend **`http://public-IPv4:5173`**
+3. **Link** Backend /users **`http://public-IPv4:3000/users?key=learn`**
+3. **1 Gambar ScreenShot**: Terminal Docker Jalan dengan latar belakang halaman web backend route users. Full Screen. [Contoh Submisi](https://drive.google.com/file/d/10R7xLgCjEVcQhzm9E1Pma52mgEzTsJJh/view?usp=drive_link)
 
 Lihat juga [Bebera SS Proses Setup](https://drive.google.com/drive/folders/1PDZXk2cN-5ieJyH_3CSojy8jU4HPdBD0?usp=drive_link) untuk memmbantu beri gambaran setingan yang tepat.
 
