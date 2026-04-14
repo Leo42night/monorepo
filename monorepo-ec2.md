@@ -101,6 +101,7 @@ ssh -T git@github.com
 # Amazon Linux SSH Login
 sudo dnf install -y git
 git clone git@github.com:<username>/mono-docker.git
+# bagi yang kehilangan proyek atar tertinggal jauh, bisa pakai ini https://github.com/kaniaa-kr/ppwl10-ec2
 cd mono-docker
 ```
 Jika ingin melakukan beberapa perubahan file. ubah saja di local, push ke repo. lalu di EC2 pull. terutama:
