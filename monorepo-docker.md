@@ -10,7 +10,7 @@ Referensi yang berharga untuk mulai belajar docker:
 ## 0. Prerequisite
 - Selesaikan Fitur API Google Classroom yang ada di `monorepo-3.md`
 - **Install Docker CLI**: disarankan pakai Docker CLI tanpa Docker Desktop agar lebih ringan, tapi jika sudah install Docker Desktop tidak apa-apa karena sudah include Docker CLI. 
-    - Bagi pengguna windows yang bermasalah penyimpanan dan ingin setup Docker yang ringan, bisa [install WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (disarankan pakai distro Debian karena paling ringan), lalu di dalam WSL bisa [install Docker CLI](https://docs.docker.com/engine/install/) (Docker Engine).
+    - Bagi pengguna windows yang bermasalah penyimpanan dan ingin setup Docker yang ringan, bisa [install WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (disarankan pakai distro Arch Linux karena paling ringan), lalu di dalam WSL bisa [install Docker CLI](https://docs.docker.com/engine/install/) (Docker Engine).
 
 ## 1. Setup Project
 Bagi pengguna WSL, disarankan copy project di path `mnt/c/` ke path `~` (home) di linux:
