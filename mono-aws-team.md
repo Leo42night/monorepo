@@ -1,3 +1,4 @@
+
 # PPWL 11 - AWS Team
 Instruction Team:
 - Proyek ini dikerjakan sesuia Tim yang dibagikan.
@@ -6,12 +7,12 @@ Instruction Team:
 Brief Project:
 - Menggunakan fitur AWS RDS (PostgreSQL), AWS Budgets, AWS S3 Cloudfront atau AWS Lambda.
 - 6 Fase/Role:
-  - 1. AWS Admin: Root akses · Setup global · Koordinator tim
-  - 2. IAM Client A (AWS Budgets): Cost management
-  - 3. IAM Client B (Aurora / RDS): Database layer 
-  - 4. IAM Client C (Lambda — Backend): Elysia API serverless
-  - 5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront atau Lambda
-  - 6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
+  1. AWS Admin: Root akses · Setup global · Koordinator tim
+  2. IAM Client A (AWS Budgets): Cost management
+  3. IAM Client B (Aurora / RDS): Database layer 
+  4. IAM Client C (Lambda — Backend): Elysia API serverless
+  5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront atau Lambda
+  6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
 - Submisi mungkin akan menggunakan google docs agar rapi (karena ada segmen laporan).
 
 ⚠️ **Announcement**: 
@@ -69,7 +70,7 @@ Tips ✨:
 - Tiap pindah fitur AWS Console, Buka tab baru, agar mudah kembali ke tab sebelumya. 
 - Gunakan Notepad untuk menyimpan key/config yang akan digunakan lagi.
 
-## Fase 0 — Admin: IAM, VPC, Parameter Store
+## Fase 1 — Admin: IAM, VPC, Parameter Store
 
 ### 1. Buat IAM Group dan User untuk tiap anggota
 Masuk ke AWS Console → IAM → Groups → Create group. Buat 4 group sesuai tugas anggota.
@@ -209,7 +210,7 @@ S3 → Create bucket
 ```
 > Catat S3 website endpoint (http://monorepo-frontend-prod.s3-website-ap-southeast-1.amazonaws.com) → kirim ke Anggota D dan E.
 
-## Fase 1 — Anggota A: AWS Budgets
+## Fase 2 — Anggota A: AWS Budgets
 Paralel dengan fase lain · Bisa selesai dalam 30 menit
 
 ### 1. Buat Monthly Cost Budget
@@ -256,3 +257,5 @@ Billing and Cost Management → Cost and Usage Analysis -> Coverage Report
 Tugas anda adalah men-setting filter. Screenshoot pada bagian "Coverage" dan "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region. Semakin detail semakin baik.
 - ✅ Setelah modifikasi filter, simpan sebagai report baru.
 - ✅ Screenshoot ketika H-1 pengumpulan (supaya yang dikumpulkan adalah nilai paling update).
+
+Lanjut 17 Apr: Fase 3-6
