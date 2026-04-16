@@ -13,5 +13,5 @@ Ikuti `monorepo-docker.md`!
 ## PPWL10 (AWS EC2)
 Ikuti `monorepo-ec2.md`!
 
-## PPWL11 (AWS Lambda & Bedrock)
-Ikuti `mono-lambda-bedrock.md`!
+## PPWL11 (AWS Team)
+Ikuti `mono-aws-team.md`!
