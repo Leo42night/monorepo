@@ -9,8 +9,8 @@ Brief Project:
   1. AWS Admin: Root akses, Setup global (IAM, VPC, Systems Manager), Koordinator tim
   2. IAM Client A (AWS Budgets): Budget Management & Cost Explorer
   3. IAM Client B (Aurora / RDS): PostgreSQL Database layer 
-  4. IAM Client C (Lambda — Backend): Elysia API serverless
-  5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront atau Lambda
+  4. IAM Client C (Lambda — Backend): Lambda Function Elysia API serverless
+  5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront
   6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
 - Submisi mungkin akan menggunakan google docs agar rapi (karena ada segmen laporan).
 
@@ -96,16 +96,26 @@ Group: grp-lambda-fe
   → CloudFrontFullAccess
 ```
 
-**Custom Additional Inline Policy**
+**Custom Additional Inline Policy (add dari "User groups" atau dari "Policies")**
 ```bash
 # AWS Budget butuh policy "ce:DescribeReport"
 -> masuk ke group "grp-budget" -> Permissions -> Create Inline Policy
-    Select a service "Cost Explorer Service" # di JSON codename nya "ce" (jadi anda perlu search arti dari code nya)
-    Search allowed Actions -> "DescribeReport"
-    Resource All (*)  
-    # Lihat di JSON, kode action nya menjadi "ce:DescribeReport"
-    # tabahkan juga action "ce:GetDimensionValues", "ce:GetSavingsPlansPurchaseRecommendation" and "ce:GetSavingsPlansCoverage"
-    -> Name: additionalInlinePolicy_grpBudget
+  Select a service "Cost Explorer Service" # di JSON codename nya "ce" (jadi anda perlu search arti dari code nya)
+  Search allowed Actions -> "DescribeReport"
+  Resource All (*)  
+  # Lihat di JSON, kode action nya menjadi "ce:DescribeReport"
+  # tabahkan juga action "ce:GetDimensionValues", "ce:GetSavingsPlansPurchaseRecommendation" and "ce:GetSavingsPlansCoverage"
+  -> Name: additionalInlinePolicy_grpBudget
+
+# AWS Lambda (fe & be) butuh butuh akses buat role & policy ketiak save lambda function.
+-> Policies -> Create Policy
+  Service: IAM -> Actions allow: CreateRole, CreatePolicy, AttachRolePolicy
+  Resource All
+  -> Name "additionalLambdaPolicy"
+-> User Group -> "grp-lambda-be" -> Permissions -> Add Attach Policies
+  -> tambahkan policy "additionalLambdaPolicy"
+-> lakukan hal yang sama untuk User Group "grp-lambda-fe"
+
 # Lakukan hal yang sama untuk policy lain jika IAM User butuh akses fitur.
 ```
 **✨ Tips:** Admin bisa cek login ke akun IAM, dengan buka di Incognito Mode, jadi session login lain tidak terpengaruh. 
@@ -118,6 +128,7 @@ IAM → Users → Create user
   Console password: custom / auto-generated
   Assign to group: grp-database
   → Download credentials.csv → kirim ke anggota via chat
+
 
 # Tambahkan user dengan name "asdos", beri policy "AdministratorAccess", kirim csv lewat WA ke Asdos-Leo. 
 ```
@@ -176,7 +187,7 @@ AWS Systems Manager → Parameter Store → Create parameter
 /monorepo/FRONTEND_URL             → String  (isi nanti setelah S3/CloudFront URL diketahui)
 ```
 
-**Tambahkan policy baca Parameter Store ke Lambda role (nanti)**
+**Tambahkan policy baca Parameter Store ke Lambda role (untuk anggota C)**
 ```bash
 IAM → Policies → Create policy → Visual:
   Service: System Manager
@@ -389,4 +400,259 @@ JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input lan
 - ✅ Screenshot RDS console (status Available) untuk penilaian
 - ✅ Kabari Anggota C bahwa DATABASE_URL sudah di Parameter Store
 
-🤞fase 4-6 masih di perbaiki
+# Fase 4 — Anggota C: Lambda Backend (Elysia)
+Mulai setelah Admin selesai Parameter Store, dan Anggota B update DATABASE_URL
+> Tunggu Anggota B kabari bahwa DATABASE_URL sudah di Parameter Store.
+
+## 1. Build backend Elysia menjadi bundle Lambda
+Lambda Node.js butuh handler function sebagai entry point. Elysia sudah export app, kita bungkus dengan adapter.
+
+**Beberapa modifikas file:**
+
+### a.1. prisma/schema-postgres.prisma
+Buat skema khusus postgres:
+```sh
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User { 
+  id    Int     @id @default(autoincrement()) 
+  email String  @unique
+  name  String?
+} 
+```
+### a.2. prisma/dbPostgre.ts
+tambahkan inisiasi db khusus RDS Postgres
+```ts
+// AWS Lambda tidak bisa langsung menggunakan file SQLite, jadi kita buat file baru khusus untuk PostgreSQL yang akan digunakan di Lambda. 
+// File ini akan tetap menggunakan Prisma Client, tapi dengan konfigurasi yang sesuai untuk PostgreSQL.
+import { PrismaClient } from "../src/generated/prisma-pg/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+export const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+});
+```
+### a.3. src/index.ts
+Tambahkan modifikasi untuk Load Env, Adapter Lambda & Postgre DB
+```ts
+// 1 — Ganti import { prisma } from "../prisma/db"; jadi:
+import { prisma } from "../prisma/dbPostgre";
+
+// 2.a. — Implement dynamic loader dari SSM (bagian atas sebelum app dipakai)
+import { SSMClient, GetParametersCommand } from "@aws-sdk/client-ssm";
+
+const ssm = new SSMClient({ region: "us-east-1" });
+
+const loadSSMParameters = async () => {
+  const params = [
+    "/monorepo/DATABASE_URL",
+    "/monorepo/DB_AUTH_TOKEN",
+    "/monorepo/GOOGLE_CLIENT_ID",
+    "/monorepo/GOOGLE_CLIENT_SECRET",
+    "/monorepo/GOOGLE_REDIRECT_URI",
+    "/monorepo/SESSION_SECRET",
+    "/monorepo/API_KEY",
+    "/monorepo/FRONTEND_URL"
+  ];
+
+  const command = new GetParametersCommand({
+    Names: params,
+    WithDecryption: true,
+  });
+
+  const response = await ssm.send(command);
+
+  response.Parameters?.forEach((param: any) => {
+    if (!param.Name || !param.Value) return;
+
+    const key = param.Name.split("/").pop(); // ambil nama terakhir
+    process.env[key!] = param.Value;
+  });
+};
+
+// 2.b. — Panggil sebelum app digunakan. Karena Lambda stateless, kita pakai lazy init + caching
+let isLoaded = false;
+
+export const initConfig = async () => {
+  if (!isLoaded) {
+    await loadSSMParameters();
+    isLoaded = true;
+  }
+};
+
+// 3.a. — Pisahkan app builder, bungkus app dalam "createApp"
+export const createApp = () => {
+  return new Elysia()
+    .use(
+      cors({
+        origin: process.env.FRONTEND_URL || "http://localhost:5173",
+        credentials: true,
+      }),
+    )
+    ...
+    .get("/users", async () => {
+      const users = await prisma.user.findMany();
+      const response: ApiResponse<User[]> = {
+        data: users,
+        message: "User list retrieved",
+      };
+      return response;
+    })
+    // isi kode lainnya
+};
+
+// 3.b. — Jangan eksport langsung
+// ❌ export default app;
+export default createApp;
+
+// 4 - Hapus Kode untuk development (app.listen & console.log) & kode lain yang tidak kompatibel dengan struktur sekarang. anda dapat membuat file terpisah untuk development.
+```
+### a.4. src/lambda.ts
+**Tambahkan Lambda handler di **
+```ts
+// Kode ini adalah adapter yang menghubungkan request dari AWS Lambda (API Gateway) ke aplikasi web kamu (Elysia / Fetch API style).
+import createApp, { initConfig } from "./index";
+
+let app: any;
+
+export const handler = async (event: any) => {
+  await initConfig(); // 🔥 load SSM dulu
+
+  // 👁️ DEBUG Semetara untuk cek apakah env sudah terbaca dengan benar
+  // Periksa di Cloudwatch Logs. Hapus ketika sudah berhasil.
+  console.log("ENV DATABASE_URL:", process.env.DATABASE_URL);
+
+  if (!app) {
+    app = createApp(); // 🔥 baru buat app setelah env ready
+  }
+
+  return app.handle(new Request(
+    `https://${event.headers.host}${event.rawPath}${event.rawQueryString ? '?' + event.rawQueryString : ''}`,
+    {
+      method: event.requestContext.http.method,
+      headers: event.headers,
+      body: event.body
+        ? Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8')
+        : undefined
+    }
+  )).then(async (res: any) => ({
+    statusCode: res.status,
+    headers: Object.fromEntries(res.headers),
+    body: await res.text(),
+    isBase64Encoded: false
+  }));
+};
+```
+
+### b. Install, Generate & Build
+
+```bash
+cd apps/backend
+# Install bebrapa dependency baru
+bun add @aws-sdk/client-ssm
+bun add @prisma/adapter-pg
+
+# generate client menggunakan schema-postgres.prisma
+bunx prisma generate --schema prisma/schema-postgres.prisma
+
+# build seluruh kode & dependency nya di 1 file (tapi pisahkan kode dari prisma)
+## [?] Menggunakan --target node karena kita pakai runtime "Node", bukan "Bun"
+## [?] --format cjs, Common JS. mengganti ESM 'import.meta', jadi CJS 'require'
+bun build src/lambda.ts --outdir dist-lambda --target node --format cjs --external prisma
+# copy Generated Prisma Client (postgres) & dependency
+cp -r src/generated/prisma-pg dist-lambda/generated/prisma-pg
+cp -r node_modules/.prisma dist-lambda/node_modules/.prisma 2>/dev/null || true
+
+# ZIP untuk upload (38MB -> 3.8MB) (install zip, cth di archLinux: `pacmap -S zip`)
+cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
+```
+
+## 2. Buat Lambda function di AWS Console
+Upload ZIP dan konfigurasi env vars dari Parameter Store. 
+```bash
+Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
+Lambda → Create function → Author from scratch
+  Function name: monorepo-backend
+  Runtime: Node.js ^24.x  (Latest support, atau pilih Amazon Linux jika ingin "custom" pakai bun layer)
+  Architecture: x86_64
+  
+  Execution role: "Create new role" with basic Lambda permissions
+  → setelah dibuat, attach policy SSM read (dari Admin)
+```
+
+Minta admin tambahkan policy ke Role yang baru di buat (biasanya namanya **monorepo-backend-role-xxx**), supaya Lambda Function dapat akses env vars di SSM:
+```json
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "LambdaAccessSSMKey",
+			"Effect": "Allow",
+			"Action": [
+				"ssm:GetParameters",
+				"ssm:GetParameter",
+				"kms:Decrypt"
+			],
+			"Resource": [
+				"arn:aws:ssm:us-east-1:AWS_ACCOUNT_ID:parameter/monorepo/*"
+			]
+		}
+	]
+}
+```
+**✨ Tips**: gunakan fitur search resource biar mudah
+
+**Upload ZIP**
+```bash
+Lambda → Functions -> Masuk ke fungsi yang baru dibuat
+  -> tab "Code" → Upload from → .zip file → pilih lambda-backend.zip
+    -> Runtime Settings -> Edit
+      Handler: lambda.handler
+  -> tab "Configuration" -> Edit
+      Memory: 512 MB (minimum untuk prisma)
+      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
+```
+
+**Set environment variables dari Parameter Store**
+```bash
+Lambda → Configuration → Environment variables:
+  NODE_ENV = production
+  
+  # Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
+  # dynamic load dari SSM sudah di set di index.ts
+```
+
+**Buat Lambda Function URL**
+```bash
+Lambda → Functions -> Masuk ke fungsi yang baru dibuat
+  → tab Configuration → Function URL → Create function URL
+    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
+    CORS: Enable
+      Allow origins: * (sementara, nanti ubah ke S3/CloudFront URL)
+      Allow headers: Content-Type, Authorization
+      Allow methods: *
+      Allow credentials: true
+
+→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.ap-southeast-1.on.aws)
+→ Kirim URL ini ke Anggota D dan Admin
+```
+
+- ✅ Redirect URI didapatkan: "https://FUNCTION_URL/auth/callback"
+  - Update Admin: minta update `/monorepo/GOOGLE_REDIRECT_URI` & tambahkan `GOOGLE_REDIRECT_URI` ke Google Credential Allowed Redirect URI. 
+- ✅ Test (log):
+  - Cara 1: run `aws logs tail /aws/lambda/monorepo-backend --follow` (run dulu `aws login --remote`)
+  - Cara 2: CloudWatch -> Logs Insights -> search "/aws/lambda/monorepo-backend" -> Run query (jika ter block "..is not authorized to perform", salin policy actions yang dibutuhkan dan minta admin menambahkannye ke akses ke User Group `grp-lambda-be`)
+- 📢 Jika log kosong, coba akses url dulu, log akan di trigger ulang (terutama jika pakai CLI `aws logs ..`)
+- ✅ Test: curl https://FUNCTION_URL → harus dapat response dari Elysia
+- ✅ Test: curl https://FUNCTION_URL/auth/login → harus redirect ke Google
+- ⚠️ hapus Debug `console.log("ENV DATABASE_URL...` setelah server berhasil running
+
+Fase 5 - 6 on going
