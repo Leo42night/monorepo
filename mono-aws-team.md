@@ -1,4 +1,3 @@
-
 # PPWL 11 - AWS Team
 Instruction Team:
 - Proyek ini dikerjakan sesuia Tim yang dibagikan.
@@ -7,20 +6,21 @@ Instruction Team:
 Brief Project:
 - Menggunakan fitur AWS RDS (PostgreSQL), AWS Budgets, AWS S3 Cloudfront atau AWS Lambda.
 - 6 Fase/Role:
-  1. AWS Admin: Root akses · Setup global · Koordinator tim
-  2. IAM Client A (AWS Budgets): Cost management
-  3. IAM Client B (Aurora / RDS): Database layer 
+  1. AWS Admin: Root akses, Setup global (IAM, VPC, Systems Manager), Koordinator tim
+  2. IAM Client A (AWS Budgets): Budget Management & Cost Explorer
+  3. IAM Client B (Aurora / RDS): PostgreSQL Database layer 
   4. IAM Client C (Lambda — Backend): Elysia API serverless
   5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront atau Lambda
   6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
 - Submisi mungkin akan menggunakan google docs agar rapi (karena ada segmen laporan).
 
-⚠️ **Announcement**: 
+📢 **Announcement**: 
 - File ini akan di update bertahap, karena ada beberapa tahap yang perlu dirapikan (akan ada info updatenya rutin di grup WA).
 - Untuk sekarang anda dapat langsung mengerjakan tahap yang sudah fix di bawah. 
 
-## Install & Login
 ⚠️ **Disclaimer**: tutorial ini di jalankan menggunakan WSL archLinux [wsl paling ringan], jadi mungkin akan ada kendala dependency & cara instalasi bagi yang environment berbeda.
+
+## Install & Login
 
 **Docker & docker-buildx**: Untuk windows yang mau download Docker CLI disarankan pakai WSL (kalo udh ada Docker Desktop gpp, Docker CLI  udh include otomatis).
 ```bash
@@ -124,7 +124,7 @@ IAM → Users → Create user
 > Kalau tim hanya 5 orang, tugaskan Client E (Integrasi) ke Client D, karena keduanya paling erat berkaitan (build frontend + verifikasi end-to-end).
 
 ### 2. Setup VPC dan Security Group
-Gunakan default VPC jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
+Gunakan default **VPC** (Virtual Private Cloud) jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
 
 **Buat Security Group untuk RDS**
 ```bash
@@ -150,6 +150,14 @@ Desc: Security group for Lambda functions to access RDS and external APIs
     Type: HTTPS (443) → Destination: Anywhere-IPv4 (untuk Turso/LibSQL)
 ```
 > Setelah sgLambda terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
+
+**Buat Security untuk Postgres public**: di pakai sementara untuk migrate database dari local
+```bash
+Name: postgrePublic
+Desc: Allow Local public Access to RDS PostgreSQL Database
+  Inbound: PostgreSQL (5432) → Sources (Anywhere-IPv4)
+  Outbound: semua traffic (default)
+```
 
 ### 3. Simpan semua env vars ke Parameter Store
 Jangan pernah hardcode secret di Lambda env vars. Simpan di Systems Manager Parameter Store, tipe SecureString.
@@ -258,4 +266,127 @@ Tugas anda adalah men-setting filter. Screenshoot pada bagian "Coverage" dan "Sa
 - ✅ Setelah modifikasi filter, simpan sebagai report baru.
 - ✅ Screenshoot ketika H-1 pengumpulan (supaya yang dikumpulkan adalah nilai paling update).
 
-Lanjut 17 Apr: Fase 3-6
+## Fase 3 — Anggota B: RDS Database
+Mulai setelah Admin selesai VPC & Security Group
+> Tunggu konfirmasi dari Admin bahwa sgRdsInternal dan Parameter Store sudah siap.
+
+### 1. Buat RDS
+Buat RDS PostgreSQL Free Tier (lebih aman dari sisi biaya).
+
+**RDS PostgreSQL (Free Tier)**
+```bash
+Region "us-east-1"
+Aurora and RDS → Database → Create database (FUll Configuration)
+  Engine: PostgreSQL 17
+  Database Creation Method: Full Configuration
+  Template: Sandbox  ← PENTING untuk Free Tier single-AZ
+  DB instance identifier: monorepo-db
+  Master username: postgres
+  Master password: (simpan baik-baik)
+  DB instance class: db.t3.micro
+  Storage: 20 GiB gp2
+  
+  Connectivity:
+    VPC: (pilih VPC dari Admin)
+    Subnet group: default
+    VPC security group: 
+      sgRdsInternal (dari Admin)
+      postgrePublic (sementara agar dapat migrate dari local. setelah migrasi, hapus seleksi)
+    Additional configuration:
+      Public access: Yes (sementara) ← setelah migrasi, jadikan No agar hanya dapat diakses dari Lambda
+  
+  Additional configuration
+    Initial database name: monorepo_prod
+```
+
+**Cara cek endpoint RDS** (salin endpoint tersebut)
+```bash
+RDS → Databases → monorepo-db → Connectivity & security
+→ Endpoint: monorepo-db.xxxxxxxxx.ap-southeast-1.rds.amazonaws.com
+→ Port: 5432
+```
+
+### 2. Jalankan migrate ke DB baru
+
+**Setup database local**
+```bash
+cd apps/backend
+
+# Jika bun belum ter-install di temrinal, run "curl -fsSL https://bun.com/install | bash"
+# Deploy migrasi ke local, dia akan membuat file "deb.db" jika tidak ada)
+bunx prisma migrate deploy
+# Seed (akan diminta menambahkan config seed: "bun run prisma/seed.ts")
+bunx prisma db seed
+
+# Ikuti Tutorial di "Aurora and RDS" -> "Databases" -> "monorepo-db" -> Connectivity & Security
+# download global key (karena AWS RDS default nya wajib koneksi SSL terenkripsi)
+curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+**Kirim data dari SQLite Local ke RDS PostgreSQL**
+```bash
+# copy database (create & insert) ke file sql
+cd apps/backend
+sqlite3 dev.db .dump > data.sql
+# ❌ Hapus / ubah:
+#     - PRAGMA
+#     - BEGIN TRANSACTION
+#     - COMMIT
+#     - AUTOINCREMENT → ganti jadi SERIAL
+#     - INTEGER PRIMARY KEY → jadi SERIAL PRIMARY KEY
+#! Atau Minta LLM untuk konversi ke format PostgreSQL
+
+# --- Cara 1: HeidiSQL ---
+# Gunakan HeidiSQL untuk koneksi (untuk PhpMyAdmin kurleb config nya sama)
+"New" Session
+  -> Tab "SSL", isi SSL CA certificate dengan path file 'global-bundle.pem'
+  -> Tab Settings
+    Network Type: PostgreSQL (TCP/IP)
+    Library: libpq-12.dll (atau sejenis)
+    Hostname: ENDPOINT (cth: monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com)
+    -> User, Password, Port isi sesuai setingan anda.
+  -> Rename Sessions: "AWS RDS"
+
+-> Buka Session -> Database "Public"
+  -> Jalankan Query PostgreSQL
+
+
+# --- Cara 2: psql CLI ---
+# Install postgesql, contoh di archLinux (65mb)
+sudo pacman -S postgresql
+psql --version
+# cth output: psql (PostgreSQL) 18.3
+
+export RDSHOST="monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com" 
+psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-full sslrootcert=./global-bundle.pem"
+## cth masuk ke terminal: SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off, ALPN: postgresql)
+## Tools: jika ingin keluar dari terminal postgres, run "\q" 
+
+# Setelah data.sql jadi format PostgreSQL, dump di terminal postgres
+\i data.sql
+## cth output:
+##   monorepo_prod=> \i data.sql
+##   CREATE TABLE
+##   INSERT 0 3
+
+# Periksa apakah data sudah ada
+SELECT * FROM "User";
+```
+
+⚠️ Setelah migrasi, Modify AWS Database "monorepo-db". 
+- Hapus seleksi security group "postgrePublic".
+- Jadikan Public Access "No". 
+Dengan ini, database hanya dapat diakses dari Lambda.
+
+**Setelah selesai, update Parameter Store**
+```bash
+Minta Admin update parameter /monorepo/DATABASE_URL dengan value:
+postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
+
+JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input langsung.
+```
+
+- ✅ Screenshot RDS console (status Available) untuk penilaian
+- ✅ Kabari Anggota C bahwa DATABASE_URL sudah di Parameter Store
+
+🤞fase 4-6 masih di perbaiki
