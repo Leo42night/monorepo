@@ -402,7 +402,7 @@ psql --version
 # cth output: psql (PostgreSQL) 18.3
 
 export RDSHOST="monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com" 
-psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-full sslrootcert=./global-bundle.pem"
+psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-full sslrootcert=./cert/global-bundle.pem"
 ## cth masuk ke terminal: SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off, ALPN: postgresql)
 ## Tools: jika ingin keluar dari terminal postgres, run "\q" 
 
@@ -827,6 +827,10 @@ bun build src/lambda.ts --outdir dist-lambda --target node --format cjs --extern
 
 # 4. copy Generated Prisma Client (postgres), dependency, & certificate
 cp -r src/generated/prisma-pg dist-lambda/generated/prisma-pg
+
+# jika SSH key belum ada
+mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
 mkdir -p dist-lambda/cert && cp cert/global-bundle.pem dist-lambda/cert
 cp -r node_modules/.prisma dist-lambda/node_modules/.prisma 2>/dev/null || true
 
@@ -1454,3 +1458,5 @@ Masuk ke distribution yang dibuat:
 - ✅ Test buka URL di browser → halaman React muncul (tampil data dari backend) (buka console Ctrl+shift+J untuk cek apa ada error)
 - ✅ Test refresh halaman di route `/classroom` → tidak 404 (SPA fallback bekerja)
 - ✅ Screenshot S3 ([*contoh]()) & CloudFront ([*contoh]()) penilaian
+
+Fase 6 on going (harusnya gk lama)
