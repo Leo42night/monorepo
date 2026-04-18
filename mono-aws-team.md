@@ -721,7 +721,7 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 → Kirim URL ini ke Anggota D dan Admin
 ```
 
-- ✅ Redirect URI didapatkan: "https://FUNCTION_URL/auth/callback", minta admin update `/monorepo/GOOGLE_REDIRECT_URI`. 
+- ✅ Redirect URI didapatkan, minta admin update `/monorepo/GOOGLE_REDIRECT_URI`="https://FUNCTION_URL/auth/callback", & update ke Google Cloud Console -> API Creds -> select "OAuth 2.0 Client IDs" -> Authorized redirect URIs, tambahkan "https://FUNCTION_URL". 
 - ✅ Test (log):
   - Cara 1: run `aws logs tail /aws/lambda/monorepo-backend --follow` (run dulu `aws login --remote`)
   - Cara 2: CloudWatch -> Logs Insights -> search "/aws/lambda/monorepo-backend" -> Run query (jika ter block "..is not authorized to perform", salin policy actions yang dibutuhkan dan minta admin menambahkannye ke akses ke User Group `grp-lambda-be`)
