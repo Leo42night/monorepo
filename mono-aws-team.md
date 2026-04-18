@@ -13,10 +13,6 @@ Brief Project:
   5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront
   6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
 
-📢 **Announcement**: 
-- File ini akan di update bertahap, karena ada beberapa tahap yang perlu dirapikan (akan ada info updatenya rutin di grup WA).
-- Untuk sekarang anda dapat langsung mengerjakan tahap yang sudah fix di bawah. 
-
 ⚠️ **Disclaimer**: tutorial ini di jalankan menggunakan WSL archLinux [wsl paling ringan], jadi mungkin akan ada kendala dependency & cara instalasi bagi yang environment berbeda.
 
 ✨ **Tips:** 
@@ -1477,8 +1473,6 @@ Masuk ke distribution yang dibuat:
 - ✅ Test buka URL di browser → halaman React muncul (tampil data dari backend) (buka console Ctrl+shift+J untuk cek apa ada error)
 - ✅ Test refresh halaman di route `/classroom` → tidak 404 (SPA fallback bekerja)
 - ✅ Screenshot **S3 Bucket** ([*contoh](https://drive.google.com/file/d/1A8eH8WYccBpfmT8hMh_naZqVGozolMA2/view?usp=drive_link)) & **CloudFront Distribution** ([*contoh](https://drive.google.com/file/d/1PxAGFm4mjBCKbf0SMMbJWHLj-1QX3S8Y/view?usp=drive_link)) untuk penilaian.
-
-Fase 6 on-going (harusnya gk lama)
 
 ## Fase 6 — Anggota E: Integrasi & Dokumentasi
 Mulai setelah fase C dan D selesai · Verifikasi alur end-to-end
