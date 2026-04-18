@@ -20,10 +20,18 @@ Brief Project:
 
 ⚠️ **Disclaimer**: tutorial ini di jalankan menggunakan WSL archLinux [wsl paling ringan], jadi mungkin akan ada kendala dependency & cara instalasi bagi yang environment berbeda.
 
+✨ **Tips:** 
+- Gunakan `US-Virginia (us-east-1)` jika ingin cost paling murah, jadi credit tidak terkuras banyak.
+- Tiap pindah fitur AWS Console, Buka tab baru, agar mudah kembali ke tab sebelumya. 
+- Gunakan Notepad untuk menyimpan key/config yang akan digunakan lagi.
+
 ## Install & Login
 
-**Docker & docker-buildx**: Untuk windows yang mau download Docker CLI disarankan pakai WSL (kalo udh ada Docker Desktop gpp, Docker CLI  udh include otomatis).
-```bash
+**Docker & docker-buildx**
+<details><summary>Docker Setup Steps </summary>
+
+Untuk windows yang mau download Docker CLI disarankan pakai WSL (kalo udh ada Docker Desktop gpp, Docker CLI  udh include otomatis).
+```sh
 # --- Docker ---
 docker --version
 ## Cth:
@@ -45,9 +53,14 @@ docker buildx version
 ## | github.com/docker/buildx 0.33.0 f7897eba028583e0071642db3c011e860444f8cf
 ```
 Docker & Docker Buildx sudah terinstall. Build image docker jadi lebih detail.
+</details>
 
-**AWS**: [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
-```bash
+**AWS**
+<details><summary>Step Instalasi AWS </summary>
+
+Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
+
+```sh
 # Khusus untuk Linux/WSL
 cd ~
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -64,19 +77,21 @@ aws configure set region us-east-1
 # Login ke AWS
 aws login --remote
 ```
+</details>
 
-Tips ✨: 
-- Gunakan `US-Virginia (us-east-1)` jika ingin cost paling murah, jadi credit tidak terkuras banyak.
-- Tiap pindah fitur AWS Console, Buka tab baru, agar mudah kembali ke tab sebelumya. 
-- Gunakan Notepad untuk menyimpan key/config yang akan digunakan lagi.
+<details><summary>Step  </summary>
+
+</details>
 
 ## Fase 1 — Admin: IAM, VPC, Parameter Store
 
 ### 1. Buat IAM Group dan User untuk tiap anggota
 Masuk ke AWS Console → IAM → Groups → Create group. Buat 4 group sesuai tugas anggota.
 
-**Gunakan policy type "AWS Managed"**
-```bash
+#### **Gunakan policy type "AWS Managed"**
+<details><summary>Step Add User Group</summary>
+
+```sh
 Group: grp-budget
   → AWSBudgetsActionsWithAWSResourceControlAccess
   → AWSCostAndUsageReportAutomationPolicy
@@ -95,9 +110,13 @@ Group: grp-lambda-fe
   → AmazonS3FullAccess
   → CloudFrontFullAccess
 ```
+</details>
 
-**Custom Additional Inline Policy (add dari "User groups" atau dari "Policies")**
-```bash
+**Custom Additional Inline Policy**
+<details><summary>Step Add Inline Policy</summary>
+
+Add dari "User groups" (jika hanya untuk 1 Group) atau dari "Policies" (Jika dipakai 2 atau lebih Group)
+```sh
 # AWS Budget butuh policy "ce:DescribeReport"
 -> masuk ke group "grp-budget" -> Permissions -> Create Inline Policy
   Select a service "Cost Explorer Service" # di JSON codename nya "ce" (jadi anda perlu search arti dari code nya)
@@ -118,27 +137,35 @@ Group: grp-lambda-fe
 
 # Lakukan hal yang sama untuk policy lain jika IAM User butuh akses fitur.
 ```
+</details>
+
 **✨ Tips:** Admin bisa cek login ke akun IAM, dengan buka di Incognito Mode, jadi session login lain tidak terpengaruh. 
 
-**Buat IAM User**, contoh (lakukan juga untuk Anggota lain, sesuaikan Group nya):
-```bash
+#### **Buat IAM User**
+<details><summary>Step add IAM User</summary>
+
+Lakukan untuk tiap anggota, sesuaikan Group nya.
+```sh
 IAM → Users → Create user
   Username: database-anggota-b (atau nama asli, kasih job ke nama nya biar jelas role nya)
   Access type: AWS Management Console access
   Console password: custom / auto-generated
   Assign to group: grp-database
   → Download credentials.csv → kirim ke anggota via chat
-
-
 # Tambahkan user dengan name "asdos", beri policy "AdministratorAccess", kirim csv lewat WA ke Asdos-Leo. 
 ```
+</details>
+
+> [!NOTE]
 > Kalau tim hanya 5 orang, tugaskan Client E (Integrasi) ke Client D, karena keduanya paling erat berkaitan (build frontend + verifikasi end-to-end).
 
 ### 2. Setup VPC dan Security Group
 Gunakan default **VPC** (Virtual Private Cloud) jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
 
 **Buat Security Group untuk RDS**
-```bash
+<details><summary>Step SG RDS Internal </summary>
+
+```sh
 VPC → Security Groups → Create security group
   Name: sgRdsInternal
   Description: RDS Security Group for internal PostgreSQL access from within VPC
@@ -150,9 +177,12 @@ VPC → Security Groups → Create security group
   
   Outbound rules: semua traffic (default)
 ```
+</details>
 
 **Buat Security Group untuk Lambda**
-```bash
+<details><summary>SG Lambda</summary>
+
+```sh
 Name: sgLambda
 Desc: Security group for Lambda functions to access RDS and external APIs
   Inbound: tidak perlu (Lambda dipanggil via URL, bukan VPC ingress)
@@ -160,21 +190,30 @@ Desc: Security group for Lambda functions to access RDS and external APIs
     Type: PostgreSQL (5432) → Destination: sgRdsInternal
     Type: HTTPS (443) → Destination: Anywhere-IPv4 (untuk Turso/LibSQL)
 ```
-> Setelah sgLambda terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
+</details>
 
-**Buat Security untuk Postgres public**: di pakai sementara untuk migrate database dari local
-```bash
+> [!NOTE] 
+> Setelah `sgLambda` terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
+
+**Buat Security untuk Postgres public**
+<details><summary>SG Postgre Public</summary>
+
+Dipakai untuk migrate database dari local, dan dapat di akses.
+```sh
 Name: postgrePublic
 Desc: Allow Local public Access to RDS PostgreSQL Database
   Inbound: PostgreSQL (5432) → Sources (Anywhere-IPv4)
   Outbound: semua traffic (default)
 ```
+</details>
 
 ### 3. Simpan semua env vars ke Parameter Store
 Jangan pernah hardcode secret di Lambda env vars. Simpan di Systems Manager Parameter Store, tipe SecureString.
 
 **Buat parameter (tiap baris = satu parameter).**
-```bash
+<details><summary>env vars di System Manager</summary>
+
+```sh
 AWS Systems Manager → Parameter Store → Create parameter
 
 /monorepo/GOOGLE_CLIENT_ID         → String
@@ -186,9 +225,12 @@ AWS Systems Manager → Parameter Store → Create parameter
 /monorepo/API_KEY                  → SecureString
 /monorepo/FRONTEND_URL             → String  (isi nanti setelah S3/CloudFront URL diketahui)
 ```
+</details>
 
 **Tambahkan policy baca Parameter Store ke Lambda role (untuk anggota C)**
-```bash
+<details><summary>Step Pol </summary>
+
+```sh
 IAM → Policies → Create policy → Visual:
   Service: System Manager
   Action Allowed: GetParameter, GetParameters, GetParametersByPath
@@ -199,14 +241,17 @@ IAM → Policies → Create policy → Visual:
     Name: AmazonSSMParameterStoreRead_Monorepo
     Desc: Allows Lambda functions to read configuration parameters under the monorepo path from AWS Systems Manager Parameter Store.  
 ```
+</details>
 
 - ✅ Bagikan nama parameter path (/monorepo/...) ke Anggota C
 - ✅ Jangan bagikan nilai secret-nya langsung — anggota C cukup tahu nama key-nya
 
-
 ### 4. Buat S3 bucket untuk frontend (persiapan Anggota D)
 Admin buat bucket sekarang supaya Anggota D bisa langsung upload nanti.
-```bash
+
+<details><summary>Step  </summary>
+
+```sh
 S3 → Create bucket
   Region: us-east-1
   Bucket name: s3-monorepo-frontend-prod (harus globally unique)
@@ -227,7 +272,10 @@ S3 → Create bucket
     Index document: index.html
     Error document: index.html  ← penting untuk SPA React Router
 ```
-> Catat S3 website endpoint (http://monorepo-frontend-prod.s3-website-ap-southeast-1.amazonaws.com) → kirim ke Anggota D dan E.
+</details>
+
+> [!NOTE]
+> Catat S3 website endpoint (`http://monorepo-frontend-prod.s3-website-us-east-1.amazonaws.com`) → kirim ke Anggota D dan E.
 
 ## Fase 2 — Anggota A: AWS Budgets
 Paralel dengan fase lain · Bisa selesai dalam 30 menit
@@ -236,7 +284,9 @@ Paralel dengan fase lain · Bisa selesai dalam 30 menit
 Masuk ke `Billing and Cost Management → Budgets → Create budget`.
 
 **Konfigurasi budget**
-```bash
+<details><summary>Step add Budget</summary>
+
+```sh
 Setup: Customize (advanced)
 Budget type: Cost budget
 Budget name: MonorepoTeamBudget
@@ -247,9 +297,12 @@ Budget amount: $10.00 (sesuaikan dengan estimasi tim)
 
 Filters (opsional): bisa filter per service kalau mau spesifik
 ```
+</details>
 
 **Configure alert threshold**
-```bash
+<details><summary>Step add Alert Treshold</summary>
+
+```sh
 Alert 1:
   Threshold: 50% of budgeted amount ($5.00)
   Trigger: Actual cost
@@ -265,12 +318,14 @@ Alert 3:
   Trigger: Actual + Forecasted
   Email: [email Admin + seluruh tim]
 ```
-- ✅ Screenshot halaman Budgets ([*contoh](https://drive.google.com/file/d/1IAjwCWOW1uFctIwI5QPiU2cujQMAVGfP/view?usp=drive_link)) setelah selesai (untuk penilaian, lakukan di H-1 Pengumpulan)
+</details>
+
+> ✅ Screenshot halaman Budgets ([*contoh](https://drive.google.com/file/d/1IAjwCWOW1uFctIwI5QPiU2cujQMAVGfP/view?usp=drive_link)) setelah selesai (untuk penilaian, lakukan di H-1 Pengumpulan)
 
 ### 2. Eksplorasi Cost Explorer untuk dokumentasi
 Ini bagian dokumentasi/penilaian — tunjukkan kamu paham cara membaca cost.
 
-```bash
+```sh
 Billing and Cost Management → Cost and Usage Analysis -> Coverage Report
 ```
 Tugas anda adalah men-setting filter. Screenshoot pada bagian "Coverage" dan "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region. Semakin detail semakin baik.
@@ -285,7 +340,9 @@ Mulai setelah Admin selesai VPC & Security Group
 Buat RDS PostgreSQL Free Tier (lebih aman dari sisi biaya).
 
 **RDS PostgreSQL (Free Tier)**
-```bash
+<details><summary>Step add Databse</summary>
+
+```sh
 Region "us-east-1"
 Aurora and RDS → Database → Create database (FUll Configuration)
   Engine: PostgreSQL 17
@@ -302,25 +359,29 @@ Aurora and RDS → Database → Create database (FUll Configuration)
     Subnet group: default
     VPC security group: 
       sgRdsInternal (dari Admin)
-      postgrePublic (sementara agar dapat migrate dari local. setelah migrasi, hapus seleksi)
+      postgrePublic (agar dapat migrate dari local)
     Additional configuration:
-      Public access: Yes (sementara) ← setelah migrasi, jadikan No agar hanya dapat diakses dari Lambda
+      Public access: Yes (dapat diakses di Local & Lambda)
   
   Additional configuration
     Initial database name: monorepo_prod
 ```
+</details>
 
 **Cara cek endpoint RDS** (salin endpoint tersebut)
-```bash
+```sh
 RDS → Databases → monorepo-db → Connectivity & security
-→ Endpoint: monorepo-db.xxxxxxxxx.ap-southeast-1.rds.amazonaws.com
+→ Endpoint: monorepo-db.xxxxxxxxx.us-east-1.rds.amazonaws.com
 → Port: 5432
 ```
 
 ### 2. Jalankan migrate ke DB baru
 
 **Setup database local**
-```bash
+
+<details><summary>Migrate using HeidiSQL or psql CLI</summary>
+
+```sh
 cd apps/backend
 
 # Jika bun belum ter-install di temrinal, run "curl -fsSL https://bun.com/install | bash"
@@ -335,7 +396,7 @@ curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global
 ```
 
 **Kirim data dari SQLite Local ke RDS PostgreSQL**
-```bash
+```sh
 # copy database (create & insert) ke file sql
 cd apps/backend
 sqlite3 dev.db .dump > data.sql
@@ -383,14 +444,10 @@ psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-
 # Periksa apakah data sudah ada
 SELECT * FROM "User";
 ```
-
-⚠️ Setelah migrasi, Modify AWS Database "monorepo-db". 
-- Hapus seleksi security group "postgrePublic".
-- Jadikan Public Access "No". 
-Dengan ini, database hanya dapat diakses dari Lambda.
+</details>
 
 **Setelah selesai, update Parameter Store**
-```bash
+```sh
 Minta Admin update parameter /monorepo/DATABASE_URL dengan value:
 postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
 
@@ -398,19 +455,19 @@ JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input lan
 ```
 
 - ✅ Screenshot RDS console (status Available) untuk penilaian
-- ✅ Kabari Anggota C bahwa DATABASE_URL sudah di Parameter Store
+- ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store
 
-# Fase 4 — Anggota C: Lambda Backend (Elysia)
+## Fase 4 — Anggota C: Lambda Backend (Elysia)
 Mulai setelah Admin selesai Parameter Store, dan Anggota B update DATABASE_URL
 > Tunggu Anggota B kabari bahwa DATABASE_URL sudah di Parameter Store.
 
-## 1. Build backend Elysia menjadi bundle Lambda
+### 1. Build backend Elysia menjadi bundle Lambda
 Lambda Node.js butuh handler function sebagai entry point. Elysia sudah export app, kita bungkus dengan adapter.
 
-**Beberapa modifikas file:**
+**a. Beberapa modifikas file:**
+#### 1.a. prisma/schema-postgres.prisma
+<details><summary>Skema khusus postgres</summary>
 
-### a.1. prisma/schema-postgres.prisma
-Buat skema khusus postgres:
 ```sh
 generator client {
   provider = "prisma-client-js"
@@ -428,8 +485,11 @@ model User {
   name  String?
 } 
 ```
-### a.2. prisma/dbPostgre.ts
-tambahkan inisiasi db khusus RDS Postgres
+</details>
+
+#### 1.b. prisma/dbPostgre.ts
+<details><summary>inisiasi db khusus RDS Postgres</summary>
+
 ```ts
 // AWS Lambda tidak bisa langsung menggunakan file SQLite, jadi kita buat file baru khusus untuk PostgreSQL yang akan digunakan di Lambda. 
 // File ini akan tetap menggunakan Prisma Client, tapi dengan konfigurasi yang sesuai untuk PostgreSQL.
@@ -440,8 +500,11 @@ export const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
 });
 ```
-### a.3. src/index.ts
-Tambahkan modifikasi untuk Load Env, Adapter Lambda & Postgre DB
+</details>
+
+#### 1.c. src/index.ts
+<details><summary>Modifikasi untuk Load Env, Adapter Lambda & Postgre DB</summary>
+
 ```ts
 // 1 — Ganti import { prisma } from "../prisma/db"; jadi:
 import { prisma } from "../prisma/dbPostgre";
@@ -515,8 +578,11 @@ export default createApp;
 
 // 4 - Hapus Kode untuk development (app.listen & console.log) & kode lain yang tidak kompatibel dengan struktur sekarang. anda dapat membuat file terpisah untuk development.
 ```
-### a.4. src/lambda.ts
-**Tambahkan Lambda handler di **
+</details>
+
+#### 1.d. src/lambda.ts
+<details><summary>handler untuk Lambda Function</summary>
+
 ```ts
 // Kode ini adalah adapter yang menghubungkan request dari AWS Lambda (API Gateway) ke aplikasi web kamu (Elysia / Fetch API style).
 import createApp, { initConfig } from "./index";
@@ -551,10 +617,14 @@ export const handler = async (event: any) => {
   }));
 };
 ```
+</details>
 
-### b. Install, Generate & Build
 
-```bash
+#### Install, Generate & Build
+
+<details><summary>Step Build</summary>
+
+```sh
 cd apps/backend
 # Install bebrapa dependency baru
 bun add @aws-sdk/client-ssm
@@ -574,10 +644,11 @@ cp -r node_modules/.prisma dist-lambda/node_modules/.prisma 2>/dev/null || true
 # ZIP untuk upload (38MB -> 3.8MB) (install zip, cth di archLinux: `pacmap -S zip`)
 cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
 ```
+</details>
 
-## 2. Buat Lambda function di AWS Console
+### 2. Buat Lambda function di AWS Console
 Upload ZIP dan konfigurasi env vars dari Parameter Store. 
-```bash
+```sh
 Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
 Lambda → Create function → Author from scratch
   Function name: monorepo-backend
@@ -588,7 +659,10 @@ Lambda → Create function → Author from scratch
   → setelah dibuat, attach policy SSM read (dari Admin)
 ```
 
-Minta admin tambahkan policy ke Role yang baru di buat (biasanya namanya **monorepo-backend-role-xxx**), supaya Lambda Function dapat akses env vars di SSM:
+Minta admin tambahkan policy ke Role yang baru dibuat:
+<details><summary>additionalPolicy_LambdaBE</summary>
+
+Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
 ```json
 {
 	"Version": "2012-10-17",
@@ -608,10 +682,12 @@ Minta admin tambahkan policy ke Role yang baru di buat (biasanya namanya **monor
 	]
 }
 ```
+</details>
+
 **✨ Tips**: gunakan fitur search resource biar mudah
 
 **Upload ZIP**
-```bash
+```sh
 Lambda → Functions -> Masuk ke fungsi yang baru dibuat
   -> tab "Code" → Upload from → .zip file → pilih lambda-backend.zip
     -> Runtime Settings -> Edit
@@ -622,7 +698,7 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 ```
 
 **Set environment variables dari Parameter Store**
-```bash
+```sh
 Lambda → Configuration → Environment variables:
   NODE_ENV = production
   
@@ -631,7 +707,7 @@ Lambda → Configuration → Environment variables:
 ```
 
 **Buat Lambda Function URL**
-```bash
+```sh
 Lambda → Functions -> Masuk ke fungsi yang baru dibuat
   → tab Configuration → Function URL → Create function URL
     Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
@@ -641,7 +717,7 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
       Allow methods: *
       Allow credentials: true
 
-→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.ap-southeast-1.on.aws)
+→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
 → Kirim URL ini ke Anggota D dan Admin
 ```
 
@@ -655,4 +731,4 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 - ✅ Test: curl https://FUNCTION_URL/auth/login → harus redirect ke Google
 - ⚠️ hapus Debug `console.log("ENV DATABASE_URL...` setelah server berhasil running
 
-Fase 5 - 6 on going
+Fase 5 - 6 on-going
