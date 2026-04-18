@@ -12,7 +12,6 @@ Brief Project:
   4. IAM Client C (Lambda — Backend): Lambda Function Elysia API serverless
   5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront
   6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
-- Submisi mungkin akan menggunakan google docs agar rapi (karena ada segmen laporan).
 
 📢 **Announcement**: 
 - File ini akan di update bertahap, karena ada beberapa tahap yang perlu dirapikan (akan ada info updatenya rutin di grup WA).
@@ -49,10 +48,6 @@ aws configure set region us-east-1
 # Login ke AWS
 aws login --remote
 ```
-</details>
-
-<details><summary>Step  </summary>
-
 </details>
 
 ## Fase 1 — Admin: IAM, VPC, Parameter Store
@@ -152,7 +147,7 @@ VPC → Security Groups → Create security group
 </details>
 
 **Buat Security Group untuk Lambda**
-<details><summary>SG Lambda</summary>
+<details><summary>Step SG Lambda</summary>
 
 ```sh
 Name: sgLambda
@@ -168,7 +163,7 @@ Desc: Security group for Lambda functions to access RDS and external APIs
 > Setelah `sgLambda` terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
 
 **Buat Security untuk Postgres public**
-<details><summary>SG Postgre Public</summary>
+<details><summary>Step SG Postgre Public</summary>
 
 Dipakai untuk migrate database dari local, dan dapat di akses.
 ```sh
@@ -183,7 +178,7 @@ Desc: Allow Local public Access to RDS PostgreSQL Database
 Jangan pernah hardcode secret di Lambda env vars. Simpan di Systems Manager Parameter Store, tipe SecureString.
 
 **Buat parameter (tiap baris = satu parameter).**
-<details><summary>env vars di System Manager</summary>
+<details><summary>Step env vars di System Manager</summary>
 
 ```sh
 AWS Systems Manager → Parameter Store → Create parameter
@@ -199,8 +194,10 @@ AWS Systems Manager → Parameter Store → Create parameter
 ```
 </details>
 
+- ✅ Screenshot halaman Parameter Store ([*contoh](https://drive.google.com/file/d/1llPkFZ8MGDNJrmHzxW1l7pFC_UzpmDBk/view?usp=drive_link))
+
 **Tambahkan policy baca Parameter Store ke Lambda role (untuk anggota C)**
-<details><summary>Step Pol </summary>
+<details><summary>Step Additional Policy Lambda Role</summary>
 
 ```sh
 IAM → Policies → Create policy → Visual:
@@ -221,7 +218,7 @@ IAM → Policies → Create policy → Visual:
 ### 4. Buat S3 bucket untuk frontend (persiapan Anggota D)
 Admin buat bucket sekarang supaya Anggota D bisa langsung upload nanti.
 
-<details><summary>Step  </summary>
+<details><summary>Step Create S3 Bucked for Frontend</summary>
 
 ```sh
 S3 → Create bucket
@@ -294,7 +291,7 @@ Alert 3:
 
 > ✅ Screenshot halaman Budgets ([*contoh](https://drive.google.com/file/d/1IAjwCWOW1uFctIwI5QPiU2cujQMAVGfP/view?usp=drive_link)) setelah selesai (untuk penilaian, lakukan di H-1 Pengumpulan)
 
-### 2. Eksplorasi Cost Explorer untuk dokumentasi
+### 2. Cost Explorer - Tugas Khusus (task-cost-report)
 Ini bagian dokumentasi/penilaian — tunjukkan kamu paham cara membaca cost.
 
 ```sh
@@ -351,7 +348,7 @@ RDS → Databases → monorepo-db → Connectivity & security
 
 **Setup database local**
 
-<details><summary>Migrate using HeidiSQL or psql CLI</summary>
+<details><summary>Step Migrate using HeidiSQL or psql CLI</summary>
 
 ```sh
 cd apps/backend
@@ -426,7 +423,7 @@ postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
 JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input langsung.
 ```
 
-- ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh]())
+- ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh](https://drive.google.com/file/d/1wSuy_LKIER0q7TSIzBcSq2X6nfUrb9yA/view?usp=drive_link))
 - ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store
 
 ## Fase 4 — Anggota C: Lambda Backend (Elysia)
@@ -788,7 +785,7 @@ export const handler = async (event: any) => {
 
 #### 1.i. package.json
 
-<details><summary>package.json</summary>
+<details><summary>Modify Script</summary>
 
 Ubah `dev` dan `dev:turso` ke file `server.ts`.
 ```json
@@ -807,7 +804,7 @@ Ubah `dev` dan `dev:turso` ke file `server.ts`.
 
 #### Install, Generate & Build
 
-<details><summary>Step-Step Build -> Upload</summary>
+<details><summary>Step Build -> Upload Backend</summary>
 
 ```sh
 cd apps/backend
@@ -842,7 +839,7 @@ cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
 ### 2. Buat Lambda function di AWS Console
 Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
 
-Proses-proses nya sebagai berikut:
+**Proses Lambda function Backend Elysia Prisma berikut:**
 <details><summary>Buat Lambda Function</summary>
 
 ```sh
@@ -913,7 +910,7 @@ Lambda → Configuration → Environment variables:
 Lambda → Functions -> Masuk ke fungsi yang baru dibuat
   → tab Configuration → Function URL → Create function URL
     Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
-    CORS: Disabled (CORS di handle manual dari kode Elysia)
+    CORS: Disabled (CORS di-handle manual dari kode Elysia)
 
 → Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
 → Kirim URL ini ke Anggota D dan Admin
@@ -928,8 +925,9 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 - ✅ Test: https://FUNCTION_URL → harus dapat response dari Elysia
 - ✅ Test: https://FUNCTION_URL/users?key=learn → harus dapat response data dari Prisma
 - ✅ Test: https://FUNCTION_URL/auth/login → harus redirect ke Google 
+- ✅ Screenshot **Function Lambda** ([*contoh](https://drive.google.com/file/d/1o5a-7kahnrBD94lnW_hkpJhL15wBv8iF/view?usp=drive_link))
 
-## Fase 5 — Anggota D: Lambda / S3 Frontend (React)
+## Fase 5 — Anggota D: S3 Cloudfront Frontend (React)
 Mulai setelah Anggota C kirim Function URL backend
 > Tunggu Anggota C kirim Lambda Function URL sebelum jalankan vite build.
 
@@ -939,7 +937,7 @@ Vite bake env vars saat build time. Pastikan URL dari Anggota C sudah di-set seb
 #### 1.a. App3.tsx
 <details><summary>apps/frontend/App3.tsx</summary>
 
-**Perbarui `App3.tsx`** Autentikasi berganti dari session cookie jadi **JWT Token**
+**Perbarui `App3.tsx`** Autentikasi berganti dari *session cookie* jadi **JWT Token**
 ```tsx
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Course, CourseWorkWithSubmission, SubmissionAttachmentItem } from "shared"
@@ -1379,7 +1377,7 @@ createRoot(document.getElementById('root')!).render(
 Upload semua file dari folder dist/ ke S3 bucket yang sudah dibuat Admin.
 
 #### **Test Build**
-<details><summary>Step nya</summary>
+<details><summary>Step Test Build</summary>
 
 **Add Pacakge -> Set env -> test di dev (berhasil) -> Build**
 ```sh
@@ -1455,7 +1453,7 @@ http://s3-monorepo-frontend-prod.s3-website-us-east-1.amazonaws.com
 > TIDAK akan berfungsi dari S3 URL biasa. kita akan setup CloudFront (lihat langkah berikut).
 
 **Setup CloudFront untuk HTTPS**
-<details><summary>Step pasang HTTPS</summary>
+<details><summary>Step CloudFront pasang HTTPS</summary>
 
 ```sh
 CloudFront → Create distribution
@@ -1478,6 +1476,62 @@ Masuk ke distribution yang dibuat:
 
 - ✅ Test buka URL di browser → halaman React muncul (tampil data dari backend) (buka console Ctrl+shift+J untuk cek apa ada error)
 - ✅ Test refresh halaman di route `/classroom` → tidak 404 (SPA fallback bekerja)
-- ✅ Screenshot S3 ([*contoh](https://drive.google.com/file/d/1A8eH8WYccBpfmT8hMh_naZqVGozolMA2/view?usp=drive_link)) & CloudFront ([*contoh](https://drive.google.com/file/d/1PxAGFm4mjBCKbf0SMMbJWHLj-1QX3S8Y/view?usp=drive_link)) untuk penilaian.
+- ✅ Screenshot **S3 Bucket** ([*contoh](https://drive.google.com/file/d/1A8eH8WYccBpfmT8hMh_naZqVGozolMA2/view?usp=drive_link)) & **CloudFront Distribution** ([*contoh](https://drive.google.com/file/d/1PxAGFm4mjBCKbf0SMMbJWHLj-1QX3S8Y/view?usp=drive_link)) untuk penilaian.
 
 Fase 6 on-going (harusnya gk lama)
+
+## Fase 6 — Anggota E: Integrasi & Dokumentasi
+Mulai setelah fase C dan D selesai · Verifikasi alur end-to-end
+> Jalankan setelah Fase 3 (Lambda BE) dan Fase 4 (S3/FE) selesai.
+
+### 1. Check Fitur
+Ini titik integrasi paling rawan gagal. Jalankan checklist berikut secara urut.
+
+**Checklist OAuth flow**
+1. Buka FRONTEND_URL di browser
+2. Klik "Login dengan Google"
+3. Pastikan redirect ke accounts.google.com (Fase 4/Anggota C-bukan error CORS)
+4. Login, pastikan redirect kembali ke GOOGLE_REDIRECT_URI (Fase 4/Anggota C-Lambda Backend)
+5. Lambda set JWT Token → redirect ke `FRONTEND_URL/classroom` → Cek apakah CORS backend berhasil & mengembalikan response data (DevTools → Network → cek request: `/auth/me` (204), `/classroom/courses`  (204))
+6. Buka `/classroom` → cek apakah JWT Token ada di localStorage setelah Login (DevTools → Application → LocalStorage)
+7. Buka `/users?key=learn` → harus dapat data dari DB (Anggota B-Database)
+
+**Debug CORS jika gagal**
+```sh
+Gejala: "CORS policy: No 'Access-Control-Allow-Origin'" di browser console
+
+Cek: Lambda C: process.env.FRONTEND_URL sudah sesuai dengan URL yang dibuka?
+   → Lambda → Configuration → Environment variables → FRONTEND_URL
+```
+
+**Update GOOGLE_REDIRECT_URI di Google Cloud Console**
+
+Jika OAuth callback gagal dengan "redirect_uri_mismatch", ini penyebabnya.
+```sh
+Google Cloud Console → APIs & Services → Credentials
+→ pilih OAuth 2.0 Client ID yang dipakai
+→ Authorized redirect URIs → Add URI: https://FUNCTION_URL/auth/callback
+
+→ Save → tunggu ~5 menit propagasi Google (biasanya cepat)
+```
+> Minta Admin untuk berikan akses ke Google Cloud Console project, atau Admin yang menambahkan URI-nya.
+
+### 2. Dokumentasi
+Publish kode ke github repo & gunakan template  `mono-aws-team-template.md` untuk isian file `README.md` sebagai laporan.
+
+### 3. Teardown (Lakukan setelah penilaian)
+- RDS: Stop instance (bukan delete, kalau mau simpan data)
+- Lambda: tidak ada biaya jika tidak ada request
+- CloudFront: Disable distribution
+- S3: Biarkan (biaya storage sangat kecil)
+
+## Parameter penilaian
+| Semua anggota (termasuk Admin) | Score |
+|---|---|
+| Layanan berjalan & dapat diakses | 60% |
+| Dokumentasi sesuai & rapi / screenshot sesuai instruksi | 20% |
+| Keamanan: least privilege IAM, env tidak hardcode | 20% |
+
+Urutan ketergantungan antar anggota yang perlu diperhatikan tim:
+- Admin harus selesai dulu karena seluruh anggota butuh IAM credentials, Security Group, dan Parameter Store sebelum bisa mulai. **A_Budget** adalah satu-satunya yang bisa langsung jalan paralel sejak pagi karena tidak bergantung siapa pun.
+- Dua titik sinkronisasi kritis di tengah hari: **B_Database** harus **C_Backend** setelah `DATABASE_URL` dimasukkan ke Parameter Store, dan **C_Backend** harus kirim Lambda Function URL ke **D_Frontend** sebelum D menjalankan `vite build` — karena URL itu di-bake ke dalam bundle JavaScript saat build time, bukan runtime.
