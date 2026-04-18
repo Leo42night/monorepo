@@ -20,8 +20,8 @@
 > [!NOTE]
 > Gunakan Canva Papan Tulis.
 > Isinya Berisi diagram yang diminta. Masukkan Screenshoot yang diminta pada tiap fase ke tiap node terkait.
-> (*[contoh](https://canva.link/xdtc48nrltbss4k). Contoh hanyalah referensi, gabungan arsitektur & flow diagram. Tidak perlu sekompleks ini, desain arsitektur sesuai kebutuhan kalian, lihat contoh Arsitektur Diagram di internet.)
-> Screenshot lainnya dapat ditambahkan bila perlu, tapi Screenshot yang wajib ada adalah (s3-frontend, rds-database, parameter_store, lambda-backend, cloudfront-frontend, budget, & task-cost-report). Pasangkan screenshot dengan tiak node arsitektur.
+> (*[contoh](https://canva.link/xdtc48nrltbss4k). Contoh hanyalah referensi, gabungan arsitektur & flow diagram. Tidak perlu sekompleks ini, lihat contoh Arsitektur Diagram di internet, tidak perlu ikuti standar baku, desain sesuai kebutuhan style kalian)
+> Screenshot lainnya dapat ditambahkan bila perlu, tapi Screenshot yang wajib ada adalah (s3-frontend, rds-database, parameter_store, lambda-backend, cloudfront-frontend, budget, & task-cost-report). Pasangkan screenshot dengan tiap node arsitektur, buat struktur flow bila perlu.
 
 **Komponen yang harus muncul di diagram**
 ```sh
