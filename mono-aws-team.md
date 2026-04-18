@@ -27,34 +27,6 @@ Brief Project:
 
 ## Install & Login
 
-**Docker & docker-buildx**
-<details><summary>Docker Setup Steps </summary>
-
-Untuk windows yang mau download Docker CLI disarankan pakai WSL (kalo udh ada Docker Desktop gpp, Docker CLI  udh include otomatis).
-```sh
-# --- Docker ---
-docker --version
-## Cth:
-## | [root@LeoLPC ppwl10-ec2]# docker --version
-## | Docker version 29.4.0, build 9d7ad9ff18
-docker login
-## Login pakai akun Github biar mudah.
-## klik url yang tampil di terminal, input-kan one time code yang tampil di terminal.
-## Jika berhasil login, harusnya tampil pesan `Login Succeeded`.
-
-# --- Docker Buildx ---
-# 1. Install docker-buildx (untuk build image, diperlukan pada versi docker terbaru)
-## contoh install di ArchLinux (sesuaikan dengan package manager anda)
-sudo pacman -Syu docker-buildx
-# 2. Cek Versi
-docker buildx version
-## Cth:
-## | [root@LeoLPC ppwl10-ec2]# docker buildx version
-## | github.com/docker/buildx 0.33.0 f7897eba028583e0071642db3c011e860444f8cf
-```
-Docker & Docker Buildx sudah terinstall. Build image docker jadi lebih detail.
-</details>
-
 **AWS**
 <details><summary>Step Instalasi AWS </summary>
 
@@ -219,7 +191,7 @@ AWS Systems Manager → Parameter Store → Create parameter
 /monorepo/GOOGLE_CLIENT_ID         → String
 /monorepo/GOOGLE_CLIENT_SECRET     → SecureString
 /monorepo/GOOGLE_REDIRECT_URI      → String  (isi nanti setelah Lambda URL diketahui)
-/monorepo/SESSION_SECRET           → SecureString
+/monorepo/JWT_SECRET               → SecureString (isi bebas, auntentikasi pengganti session cookie)
 /monorepo/DATABASE_URL             → SecureString  (isi setelah Anggota B selesai RDS)
 /monorepo/DB_AUTH_TOKEN            → SecureString
 /monorepo/API_KEY                  → SecureString
@@ -350,7 +322,7 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   Template: Sandbox  ← PENTING untuk Free Tier single-AZ
   DB instance identifier: monorepo-db
   Master username: postgres
-  Master password: (simpan baik-baik)
+  Master password: (simpan baik-baik, jangan pakai simbol: !$"'")
   DB instance class: db.t3.micro
   Storage: 20 GiB gp2
   
@@ -392,7 +364,7 @@ bunx prisma db seed
 
 # Ikuti Tutorial di "Aurora and RDS" -> "Databases" -> "monorepo-db" -> Connectivity & Security
 # download global key (karena AWS RDS default nya wajib koneksi SSL terenkripsi)
-curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 ```
 
 **Kirim data dari SQLite Local ke RDS PostgreSQL**
@@ -487,167 +459,386 @@ model User {
 ```
 </details>
 
-#### 1.b. prisma/dbPostgre.ts
+#### 1.b. prisma/db.ts
+<details><summary>Handler Lazy Load & export</summary>
+
+```ts
+import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
+import path from "path";
+
+export const dbUrl = process.env.DATABASE_URL || `file:${path.resolve(__dirname, "../dev.db")}`;
+
+const adapter = new PrismaLibSql({ url: dbUrl, authToken: process.env.DB_AUTH_TOKEN });
+
+let prisma: PrismaClient;
+
+export const getPrisma = () => {
+  if (!prisma) {
+    prisma = new PrismaClient({ adapter });
+  }
+  return prisma;
+};
+```
+</details>
+
+#### 1.c. prisma/dbPostgre.ts
 <details><summary>Inisiasi db khusus RDS Postgres</summary>
 
 ```ts
 // AWS Lambda tidak bisa langsung menggunakan file SQLite, jadi kita buat file baru khusus untuk PostgreSQL yang akan digunakan di Lambda. 
-// File ini akan tetap menggunakan Prisma Client, tapi dengan konfigurasi yang sesuai untuk PostgreSQL.
+// File ini akan tetap menggunakan Prisma Client dengan skema PostgreSQL.
 import { PrismaClient } from "../src/generated/prisma-pg/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import fs from "fs";
+import path from "path";
 
-export const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
-});
+const ca = fs.readFileSync(
+  path.join(process.cwd(), "cert/global-bundle.pem")
+).toString();
+
+// Kita buat singleton Prisma Client agar dipanggil ketika SSM sudah siap, dan tidak dibuat ulang setiap kali handler dipanggil (karena Lambda bisa reuse container).
+let prisma: PrismaClient;
+
+export const getPrisma = () => {
+  if (!prisma) {
+    prisma = new PrismaClient({
+      adapter: new PrismaPg({
+        connectionString: process.env.DATABASE_URL!,
+        ssl: {
+          ca, // lokasi file sertifikat SSL untuk RDS, ketika build akan relatif ke folder /apps/backend/dist-lambda/
+          rejectUnauthorized: true,
+        }
+      }),
+    });
+  }
+
+  return prisma;
+};
 ```
 </details>
 
-#### 1.c. src/index.ts
-<details><summary>Modifikasi untuk Load Env, Adapter Lambda & Postgre DB</summary>
+#### 1.d. src/config.ts
+<details><summary>Berisi SSM loader</summary>
 
 ```ts
-// 1 — Ganti import { prisma } from "../prisma/db"; jadi:
-import { prisma } from "../prisma/dbPostgre";
-
-// 2.a. — Implement dynamic loader dari SSM (bagian atas sebelum app dipakai)
 import { SSMClient, GetParametersCommand } from "@aws-sdk/client-ssm";
 
 const ssm = new SSMClient({ region: "us-east-1" });
 
-const loadSSMParameters = async () => {
-  const params = [
-    "/monorepo/DATABASE_URL",
-    "/monorepo/DB_AUTH_TOKEN",
-    "/monorepo/GOOGLE_CLIENT_ID",
-    "/monorepo/GOOGLE_CLIENT_SECRET",
-    "/monorepo/GOOGLE_REDIRECT_URI",
-    "/monorepo/SESSION_SECRET",
-    "/monorepo/API_KEY",
-    "/monorepo/FRONTEND_URL"
-  ];
+const SSM_PARAMS = [
+  "/monorepo/DATABASE_URL",
+  "/monorepo/DB_AUTH_TOKEN",
+  "/monorepo/GOOGLE_CLIENT_ID",
+  "/monorepo/GOOGLE_CLIENT_SECRET",
+  "/monorepo/GOOGLE_REDIRECT_URI",
+  "/monorepo/JWT_SECRET",
+  "/monorepo/API_KEY",
+  "/monorepo/FRONTEND_URL",
+];
+
+let isLoaded = false;
+
+export const loadConfig = async () => {
+  if (isLoaded) return;
 
   const command = new GetParametersCommand({
-    Names: params,
+    Names: SSM_PARAMS,
     WithDecryption: true,
   });
 
   const response = await ssm.send(command);
 
-  response.Parameters?.forEach((param: any) => {
+  response.Parameters?.forEach((param) => {
     if (!param.Name || !param.Value) return;
-
-    const key = param.Name.split("/").pop(); // ambil nama terakhir
-    process.env[key!] = param.Value;
+    const key = param.Name.split("/").pop()!;
+    process.env[key] = param.Value;
   });
+
+  isLoaded = true;
 };
+```
+</details>
 
-// 2.b. — Panggil sebelum app digunakan. Karena Lambda stateless, kita pakai lazy init + caching
-let isLoaded = false;
+#### 1.e. src/types.ts
+<details><summary>Berisi custom types Prisma Client untuk security</summary>
 
-export const initConfig = async () => {
-  if (!isLoaded) {
-    await loadSSMParameters();
-    isLoaded = true;
-  }
-};
+```ts
+export interface DbClient {
+  user: {
+    findMany: () => Promise<any[]>;
+  };
+  // tambah model & method lain sesuai kebutuhan
+}
+```
+</details>
 
-// 3.a. — Pisahkan app builder, bungkus app dalam "createApp"
-export const createApp = () => {
-  return new Elysia()
+#### 1.f. src/index.ts
+<details><summary>Berisi shared app factory</summary>
+
+Hanya routes & middleware, terima `getPrisma` via DI
+```ts
+import { Elysia } from "elysia";
+import { cookie } from "@elysiajs/cookie";
+import { jwt } from "@elysiajs/jwt";
+import { createOAuthClient, getAuthUrl } from "./auth";
+import { getCourses, getCourseWorks, getSubmissions } from "./classroom";
+import type { ApiResponse, HealthCheck, User } from "shared";
+import type { DbClient } from "./types";
+
+// Auth middleware — reusable di semua route yang butuh autentikasi
+const makeAuthMiddleware = (jwtInstance: any) =>
+  async ({ headers, set }: any) => {
+    const authHeader = headers.authorization;
+    if (!authHeader) {
+      set.status = 401;
+      return null;
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const payload = await jwtInstance.verify(token);
+
+    if (!payload) {
+      set.status = 401;
+      return null;
+    }
+
+    return payload;
+  };
+
+// Factory menerima `getPrisma` sebagai dependency injection
+// sehingga dev pakai LibSQL, prod pakai PostgreSQL — tanpa mengubah routes
+export const createApp = (getPrisma: () => DbClient) => {
+  const app = new Elysia()
+    .use(cookie())
     .use(
-      cors({
-        origin: process.env.FRONTEND_URL || "http://localhost:5173",
-        credentials: true,
-      }),
+      jwt({
+        name: "jwt",
+        secret: process.env.JWT_SECRET!,
+        exp: "1d",
+      })
     )
-    ...
+
+    // Middleware akses kontrol untuk /users
+    .onRequest(({ request, set }) => {
+      const url = new URL(request.url);
+      if (!url.pathname.startsWith("/users")) return;
+
+      const origin = request.headers.get("origin");
+      const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+      const key = url.searchParams.get("key");
+
+      // Izinkan dari frontend resmi
+      if (origin === frontendUrl) return;
+
+      // Selain itu wajib pakai API_KEY
+      if (key !== process.env.API_KEY) {
+        set.status = 401;
+        return { message: "Unauthorized: Access denied without valid API Key" };
+      }
+    })
+
+    // Health check
+    .get("/", (): ApiResponse<HealthCheck> => ({
+      data: { status: "ok" },
+      message: "server running",
+    }))
+
+    // Users
     .get("/users", async () => {
-      const users = await prisma.user.findMany();
+      const users = await getPrisma().user.findMany();
       const response: ApiResponse<User[]> = {
         data: users,
         message: "User list retrieved",
       };
       return response;
     })
-    // isi kode lainnya
+
+    // Auth — redirect ke Google login
+    .get("/auth/login", ({ redirect }) => {
+      const oauth2Client = createOAuthClient();
+      const url = getAuthUrl(oauth2Client);
+      return redirect(url);
+    })
+
+    // Auth — Google OAuth callback
+    .get("/auth/callback", async ({ query, jwt, redirect }) => {
+      const { code } = query as any;
+      const oauth2Client = createOAuthClient();
+      const { tokens } = await oauth2Client.getToken(code);
+
+      const token = await jwt.sign({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
+
+      return redirect(`${process.env.FRONTEND_URL}/classroom?token=${token}`);
+    })
+
+    // Auth — cek sesi user dari JWT
+    .get("/auth/me", async ({ headers, jwt, set }) => {
+      const auth = makeAuthMiddleware(jwt);
+      const user = await auth({ headers, set });
+      if (!user) return { loggedIn: false };
+      return { loggedIn: true, user };
+    })
+
+    // Classroom — daftar courses
+    .get("/classroom/courses", async ({ headers, jwt, set }) => {
+      const auth = makeAuthMiddleware(jwt);
+      const user = await auth({ headers, set });
+      if (!user) return;
+
+      const courses = await getCourses(user.access_token);
+      return { data: courses };
+    })
+
+    // Classroom — submissions per course
+    .get("/classroom/courses/:courseId/submissions", async ({ params, headers, jwt, set }) => {
+      const auth = makeAuthMiddleware(jwt);
+      const user = await auth({ headers, set });
+      if (!user) return;
+
+      const { courseId } = params;
+      const [courseWorks, submissions] = await Promise.all([
+        getCourseWorks(user.access_token, courseId),
+        getSubmissions(user.access_token, courseId),
+      ]);
+
+      return {
+        data: courseWorks.map((cw) => ({
+          courseWork: cw,
+          submission: submissions.find((s) => s.courseWorkId === cw.id) ?? null,
+        })),
+      };
+    });
+
+  return app;
 };
-
-// 3.b. — Jangan eksport langsung
-// ❌ export default app;
-export default createApp;
-
-// 4 - Hapus Kode untuk development (app.listen & console.log) & kode lain yang tidak kompatibel dengan struktur sekarang. anda dapat membuat file terpisah untuk development.
 ```
 </details>
 
-#### 1.d. src/lambda.ts
-<details><summary>handler untuk Lambda Function</summary>
+#### 1.g. src/server.ts
+<details><summary>dev entry point</summary>
+
+Import `prisma` dari `prisma/db` (LibSQL). Tampilkan detail log.
+```ts
+import { createApp } from "./index";
+import { getPrisma, dbUrl } from "../prisma/db"; // LibSQL
+import cors from "@elysiajs/cors";
+
+const app = createApp(getPrisma);
+
+app.use(cors({
+  origin: "*",
+  allowedHeaders: ["Content-Type", "Authorization"],
+}))
+.listen(3000);
+
+console.log("🦊 Backend    → http://localhost:3000");
+console.log("🦊 FRONTEND_URL →", process.env.FRONTEND_URL);
+console.log("🦊 DATABASE_URL →", dbUrl);
+console.log("🦊 REDIRECT_URI →", process.env.GOOGLE_REDIRECT_URI);
+```
+</details>
+
+#### 1.h. src/lambda.ts
+<details><summary>prod entry point</summary>
 
 ```ts
-// Kode ini adalah adapter yang menghubungkan request dari AWS Lambda (API Gateway) ke aplikasi web kamu (Elysia / Fetch API style).
-import createApp, { initConfig } from "./index";
+import { createApp } from "./index";
+import { loadConfig } from "./config";       // SSM loader
+import { getPrisma } from "../prisma/dbPostgres"; // PostgreSQL
 
-let app: any;
+let app: ReturnType<typeof createApp>;
 
 export const handler = async (event: any) => {
-  await initConfig(); // 🔥 load SSM dulu
-
-  // 👁️ DEBUG Semetara untuk cek apakah env sudah terbaca dengan benar
-  // Periksa di Cloudwatch Logs. Hapus ketika sudah berhasil.
-  console.log("ENV DATABASE_URL:", process.env.DATABASE_URL);
+  await loadConfig(); // load SSM sekali, lalu di-cache
 
   if (!app) {
-    app = createApp(); // 🔥 baru buat app setelah env ready
+    app = createApp(getPrisma); // buat app setelah env ready
   }
 
-  return app.handle(new Request(
-    `https://${event.headers.host}${event.rawPath}${event.rawQueryString ? '?' + event.rawQueryString : ''}`,
-    {
+  console.log("[DATABASE_URL]:", process.env.DATABASE_URL);
+
+  const url = `https://${event.headers.host}${event.rawPath}${
+    event.rawQueryString ? "?" + event.rawQueryString : ""
+  }`;
+
+  const response = await app.handle(
+    new Request(url, {
       method: event.requestContext.http.method,
       headers: event.headers,
       body: event.body
-        ? Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8')
-        : undefined
-    }
-  )).then(async (res: any) => ({
-    statusCode: res.status,
-    headers: Object.fromEntries(res.headers),
-    body: await res.text(),
-    isBase64Encoded: false
-  }));
+        ? Buffer.from(event.body, event.isBase64Encoded ? "base64" : "utf8")
+        : undefined,
+    })
+  );
+
+  return {
+    statusCode: response.status,
+    headers: Object.fromEntries(response.headers),
+    body: await response.text(),
+    isBase64Encoded: false,
+  };
 };
 ```
 </details>
 
 
+#### 1.i. package.json
+
+<details><summary>package.json</summary>
+
+Ubah `dev` dan `dev:turso` ke file `server.ts`.
+```json
+{
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "dev:turso": "bun --env-file=.env.production src/server.ts",
+  }
+}
+```
+
+- ✅ Test: `cd apss/backend && bun dev`
+  - `localhost:3000/users?key=learn` Tampil data.
+  - `localhost:3000/auth/login` Harus buka popup Google (Jika dapat `error 400 url_mismatch`, Pastikan `http://localhost:3000/auth/callback` ada di GCC -> API -> Cred -> Client ID -> Tambahkan di list `Authorized redirect URIs`).
+</details>
+
 #### Install, Generate & Build
 
-<details><summary>Step Build</summary>
+<details><summary>Step-Step Build -> Upload</summary>
 
 ```sh
 cd apps/backend
-# Install bebrapa dependency baru
-bun add @aws-sdk/client-ssm
-bun add @prisma/adapter-pg
+# 1. Install bebrapa dependency baru
+## aws untuk elysia dapat baca env vars di SSM
+## adapter-pg utnuk code client Postgres DB
+## JWT untuk metode autentikasi baru  
+bun add @aws-sdk/client-ssm @prisma/adapter-pg @elysiajs/jwt
 
-# generate client menggunakan schema-postgres.prisma
+# 2. generate client menggunakan schema-postgres.prisma
 bunx prisma generate --schema prisma/schema-postgres.prisma
 
-# build seluruh kode & dependency nya di 1 file (tapi pisahkan kode dari prisma)
+# 3. build seluruh kode di 1 file (tapi pisahkan prisma dari build code)
 ## [?] Menggunakan --target node karena kita pakai runtime "Node", bukan "Bun"
 ## [?] --format cjs, Common JS. mengganti ESM 'import.meta', jadi CJS 'require'
 bun build src/lambda.ts --outdir dist-lambda --target node --format cjs --external prisma
-# copy Generated Prisma Client (postgres) & dependency
+
+# 4. copy Generated Prisma Client (postgres), dependency, & certificate
 cp -r src/generated/prisma-pg dist-lambda/generated/prisma-pg
+mkdir -p dist-lambda/cert && cp cert/global-bundle.pem dist-lambda/cert
 cp -r node_modules/.prisma dist-lambda/node_modules/.prisma 2>/dev/null || true
 
-# ZIP untuk upload (38MB -> 3.8MB) (install zip, cth di archLinux: `pacmap -S zip`)
+# 5. ZIP untuk upload (38MB -> 3.8MB) (install zip, cth di archLinux: `pacmap -S zip`)
 cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
 ```
 </details>
 
 ### 2. Buat Lambda function di AWS Console
-Upload ZIP dan konfigurasi env vars dari Parameter Store. 
+Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
+
+**Buat Lambda Function**
 ```sh
 Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
 Lambda → Create function → Author from scratch
@@ -688,7 +879,7 @@ Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat aks
 
 **Upload ZIP**
 ```sh
-Lambda → Functions -> Masuk ke fungsi yang baru dibuat
+Lambda → Functions → [nama function]
   -> tab "Code" → Upload from → .zip file → pilih lambda-backend.zip
     -> Runtime Settings -> Edit
       Handler: lambda.handler
@@ -703,7 +894,7 @@ Lambda → Configuration → Environment variables:
   NODE_ENV = production
   
   # Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
-  # dynamic load dari SSM sudah di set di index.ts
+  # dynamic load dari SSM sudah di set di config.ts
 ```
 
 **Buat Lambda Function URL**
@@ -711,23 +902,555 @@ Lambda → Configuration → Environment variables:
 Lambda → Functions -> Masuk ke fungsi yang baru dibuat
   → tab Configuration → Function URL → Create function URL
     Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
-    CORS: Enable
-      Allow origins: * (sementara, nanti ubah ke S3/CloudFront URL)
-      Allow headers: Content-Type, Authorization
-      Allow methods: *
-      Allow credentials: true
+    CORS: Disabled (CORS di handle manual dari kode Elysia)
 
 → Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
 → Kirim URL ini ke Anggota D dan Admin
 ```
 
-- ✅ Redirect URI didapatkan, minta admin update `/monorepo/GOOGLE_REDIRECT_URI`="https://FUNCTION_URL/auth/callback", & update ke Google Cloud Console -> API Creds -> select "OAuth 2.0 Client IDs" -> Authorized redirect URIs, tambahkan "https://FUNCTION_URL". 
-- ✅ Test (log):
+- ✅ Redirect URI didapatkan ("https://FUNCTION_URL/auth/callback"): minta admin update ke AWS Parameter Store `/monorepo/GOOGLE_REDIRECT_URI` & ke GCC -> API Creds -> select Name di "OAuth 2.0 Client IDs" -> tambahkan url ke Authorized redirect URIs. 
+- ✅ Test log:
   - Cara 1: run `aws logs tail /aws/lambda/monorepo-backend --follow` (run dulu `aws login --remote`)
   - Cara 2: CloudWatch -> Logs Insights -> search "/aws/lambda/monorepo-backend" -> Run query (jika ter block "..is not authorized to perform", salin policy actions yang dibutuhkan dan minta admin menambahkannye ke akses ke User Group `grp-lambda-be`)
-- 📢 Jika log kosong, coba akses url dulu, log akan di trigger ulang (terutama jika pakai CLI `aws logs ..`)
-- ✅ Test: curl https://FUNCTION_URL → harus dapat response dari Elysia
-- ✅ Test: curl https://FUNCTION_URL/auth/login → harus redirect ke Google
-- ⚠️ hapus Debug `console.log("ENV DATABASE_URL...` setelah server berhasil running
+  - 📢 Jika log kosong, coba akses url dulu, log akan di trigger ulang (terutama jika pakai CLI `aws logs ..`)
+- ✅ Test: https://FUNCTION_URL → harus dapat response dari Elysia
+- ✅ Test: https://FUNCTION_URL/users?key=learn → harus dapat response data dari Prisma
+- ✅ Test: https://FUNCTION_URL/auth/login → harus redirect ke Google 
 
-Fase 5 - 6 on-going
+## Fase 5 — Anggota D: Lambda / S3 Frontend (React)
+Mulai setelah Anggota C kirim Function URL backend
+> Tunggu Anggota C kirim Lambda Function URL sebelum jalankan vite build.
+
+### 1. Build React dengan VITE_BACKEND_URL dari Lambda C
+Vite bake env vars saat build time. Pastikan URL dari Anggota C sudah di-set sebelum vite build.
+
+#### 1.a. App3.tsx
+<details><summary>apps/frontend/App3.tsx</summary>
+
+**Perbarui `App3.tsx`** Autentikasi berganti dari session cookie jadi **JWT Token**
+```tsx
+import { useCallback, useEffect, useRef, useState } from "react"
+import type { Course, CourseWorkWithSubmission, SubmissionAttachmentItem } from "shared"
+
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+
+type AuthStatus = "loading" | "unauthenticated" | "authenticated"
+
+// ─────────────────────────────────────────────
+// Auth helpers — semua interaksi token lewat sini
+// ─────────────────────────────────────────────
+
+const TOKEN_KEY = "token"
+
+const tokenStorage = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
+// Wrapper fetch yang otomatis sisipkan Authorization header.
+// Lempar error khusus jika 401 agar caller bisa handle logout.
+class UnauthorizedError extends Error {}
+
+const authFetch = async (url: string, token: string): Promise<Response> => {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  if (res.status === 401) throw new UnauthorizedError("Token tidak valid atau sudah expired")
+
+  return res
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+function formatDueDate(dueDate?: { year: number; month: number; day: number }) {
+  if (!dueDate) return "Tidak ada deadline"
+  return new Date(dueDate.year, dueDate.month - 1, dueDate.day).toLocaleDateString("id-ID", {
+    day: "numeric", month: "long", year: "numeric",
+  })
+}
+
+function stateLabel(state?: string) {
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    TURNED_IN: { label: "Dikumpulkan", variant: "default" },
+    RETURNED: { label: "Dinilai", variant: "secondary" },
+    CREATED: { label: "Belum Dikumpulkan", variant: "destructive" },
+    NEW: { label: "Belum Dimulai", variant: "outline" },
+    RECLAIMED_BY_STUDENT: { label: "Ditarik Kembali", variant: "outline" },
+  }
+  return map[state ?? ""] ?? { label: state ?? "–", variant: "outline" }
+}
+
+// ─────────────────────────────────────────────
+// Sub-komponen
+// ─────────────────────────────────────────────
+
+function AttachmentLink({ att }: { att: SubmissionAttachmentItem }) {
+  if (att.driveFile) {
+    return (
+      <a href={att.driveFile.alternateLink} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1 text-blue-600 hover:underline text-sm">
+        📄 {att.driveFile.title}
+      </a>
+    )
+  }
+  if (att.link) {
+    return (
+      <a href={att.link.url} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1 text-blue-600 hover:underline text-sm">
+        🔗 {att.link.title || att.link.url}
+      </a>
+    )
+  }
+  if (att.youtubeVideo) {
+    return (
+      <a href={att.youtubeVideo.alternateLink} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1 text-red-600 hover:underline text-sm">
+        ▶ {att.youtubeVideo.title}
+      </a>
+    )
+  }
+  if (att.form) {
+    return (
+      <a href={att.form.responseUrl || att.form.formUrl} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1 text-green-600 hover:underline text-sm">
+        📝 {att.form.title}
+      </a>
+    )
+  }
+  return null
+}
+
+function CourseWorkCard({ item }: { item: CourseWorkWithSubmission }) {
+  const { courseWork, submission } = item
+  const { label, variant } = stateLabel(submission?.state)
+  const attachments = submission?.assignmentSubmission?.attachments ?? []
+  const score = submission?.assignedGrade ?? submission?.draftGrade
+
+  return (
+    <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <CardHeader className="pb-2 shrink-0">
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-base leading-snug wrap-break-word min-w-0">
+            {courseWork.title}
+          </CardTitle>
+          <Badge variant={variant} className="shrink-0 whitespace-nowrap">
+            {label}
+          </Badge>
+        </div>
+        <CardDescription className="text-xs mt-1">
+          🗓 {formatDueDate(courseWork.dueDate)}
+        </CardDescription>
+      </CardHeader>
+
+      <Separator className="shrink-0" />
+
+      <ScrollArea className="flex-1 min-h-0">
+        <CardContent className="flex flex-col gap-3 pt-3 pb-4">
+          {courseWork.description && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold text-muted-foreground">DESKRIPSI</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word line-clamp-4">
+                {courseWork.description}
+              </p>
+            </div>
+          )}
+
+          {courseWork.materials && courseWork.materials.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold text-muted-foreground">LAMPIRAN TUGAS</p>
+              <div className="flex flex-col gap-1">
+                {courseWork.materials.map((mat, i) => {
+                  const att: SubmissionAttachmentItem = {
+                    driveFile: mat.driveFile?.driveFile,
+                    link: mat.link,
+                    youtubeVideo: mat.youtubeVideo,
+                    form: mat.form
+                      ? { formUrl: mat.form.formUrl, title: mat.form.title, responseUrl: "" }
+                      : undefined,
+                  }
+                  return <AttachmentLink key={i} att={att} />
+                })}
+              </div>
+            </div>
+          )}
+
+          {submission && (
+            <div className="flex items-center gap-2 shrink-0">
+              <p className="text-xs font-semibold text-muted-foreground shrink-0">SKOR</p>
+              {score !== undefined ? (
+                <span className="text-sm font-bold text-primary">
+                  {score} / {courseWork.maxPoints ?? "–"}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">Belum dinilai</span>
+              )}
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold text-muted-foreground">LAMPIRAN SUBMISI KAMU</p>
+              <div className="flex flex-col gap-1">
+                {attachments.map((att, i) => (
+                  <AttachmentLink key={i} att={att} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {submission?.shortAnswerSubmission?.answer && (
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-semibold text-muted-foreground">JAWABAN SINGKATMU</p>
+              <p className="text-sm italic wrap-break-word">
+                "{submission.shortAnswerSubmission.answer}"
+              </p>
+            </div>
+          )}
+
+          {submission?.late && (
+            <div className="pt-1">
+              <Badge variant="destructive" className="w-fit text-xs">⚠ Terlambat</Badge>
+            </div>
+          )}
+        </CardContent>
+      </ScrollArea>
+    </Card>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Main App
+// ─────────────────────────────────────────────
+
+export default function App() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading")
+  const [courses, setCourses] = useState<Course[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [items, setItems] = useState<CourseWorkWithSubmission[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Simpan token di ref agar authFetch selalu pakai nilai terbaru
+  // tanpa perlu token masuk ke dependency array effect
+  const tokenRef = useRef<string | null>(null)
+
+  // Logout — bersihkan semua state & storage
+  const logout = useCallback((reason?: string) => {
+    tokenStorage.clear()
+    tokenRef.current = null
+    setAuthStatus("unauthenticated")
+    setCourses([])
+    setItems([])
+    setSelectedCourse(null)
+    if (reason) setError(reason)
+  }, [])
+
+  // ── 1. Ambil token dari URL (callback dari Google OAuth) atau localStorage ──
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const tokenFromUrl = url.searchParams.get("token")
+
+    if (tokenFromUrl) {
+      // Bersihkan token dari URL sebelum validasi
+      window.history.replaceState({}, document.title, "/")
+      tokenStorage.set(tokenFromUrl)
+      tokenRef.current = tokenFromUrl
+    } else {
+      tokenRef.current = tokenStorage.get()
+    }
+
+    // ── 2. Validasi token ke /auth/me ──
+    // Jika tidak ada token sama sekali, langsung ke halaman login
+    if (!tokenRef.current) {
+      setAuthStatus("unauthenticated")
+      return
+    }
+
+    // Ada token → verifikasi ke backend
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${tokenRef.current}` },
+    })
+      .then(async (res) => {
+        if (res.status === 401) {
+          logout("Sesi berakhir, silakan login kembali.")
+          return
+        }
+        const data = await res.json()
+        if (!data.loggedIn) {
+          logout()
+          return
+        }
+        setAuthStatus("authenticated")
+      })
+      .catch(() => {
+        // Jika network error saat validasi, anggap token masih valid
+        // agar user tidak dipaksa logout karena masalah koneksi sementara
+        setAuthStatus("authenticated")
+      })
+  }, [logout])
+
+  // ── 3. Load courses setelah status authenticated ──
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !tokenRef.current) return
+
+    authFetch(`${import.meta.env.VITE_BACKEND_URL}/classroom/courses`, tokenRef.current)
+      .then((r) => r.json())
+      .then((d) => setCourses(d.data ?? []))
+      .catch((e) => {
+        if (e instanceof UnauthorizedError) logout("Sesi berakhir, silakan login kembali.")
+      })
+  }, [authStatus, logout])
+
+  // ── 4. Load submissions saat course dipilih ──
+  const loadSubmissions = async (courseId: string) => {
+    if (!tokenRef.current) return
+
+    setSelectedCourse(courseId)
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await authFetch(
+        `${import.meta.env.VITE_BACKEND_URL}/classroom/courses/${courseId}/submissions`,
+        tokenRef.current
+      )
+      const d = await res.json()
+      if (d.error) throw new Error(d.error)
+      setItems(d.data ?? [])
+    } catch (e) {
+      if (e instanceof UnauthorizedError) {
+        logout("Sesi berakhir, silakan login kembali.")
+      } else {
+        setError(e instanceof Error ? e.message : "Terjadi error")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = () => {
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/login`
+  }
+
+  // ── Render ──
+
+  if (authStatus === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Memuat...</p>
+      </div>
+    )
+  }
+
+  if (authStatus === "unauthenticated") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <h1 className="text-2xl font-bold">Google Classroom Viewer</h1>
+        <p className="text-muted-foreground">Login dengan akun Google kampus kamu</p>
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
+        <Button onClick={handleLogin} size="lg">
+          🎓 Login dengan Google
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">📚 Google Classroom Viewer</h1>
+        <Button variant="outline" onClick={() => logout()}>Logout</Button>
+      </div>
+
+      <div className="mb-6">
+        <p className="text-sm font-semibold text-muted-foreground mb-2">PILIH MATA KULIAH</p>
+        <div className="flex flex-wrap gap-2">
+          {courses.length === 0 && (
+            <p className="text-sm text-muted-foreground">Tidak ada mata kuliah ditemukan.</p>
+          )}
+          {courses.map((c) => (
+            <Button
+              key={c.id}
+              variant={selectedCourse === c.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => loadSubmissions(c.id)}
+            >
+              {c.name}
+              {c.section && <span className="ml-1 text-xs opacity-70">· {c.section}</span>}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <Separator className="mb-6" />
+
+      {error && (
+        <div className="mb-4 p-3 rounded bg-destructive/10 text-destructive text-sm">{error}</div>
+      )}
+
+      {loading && (
+        <div className="text-center py-12 text-muted-foreground">Mengambil data tugas...</div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <>
+          <p className="text-sm text-muted-foreground mb-4">{items.length} tugas ditemukan</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {items.map((item) => (
+              <CourseWorkCard key={item.courseWork.id} item={item} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {!loading && selectedCourse && items.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          Tidak ada tugas di mata kuliah ini.
+        </div>
+      )}
+    </div>
+  )
+}
+```
+</details>
+
+#### 1.b. main.tsx
+<details><summary>Menggunakan React Router Dom</summary>
+
+```tsx
+import { StrictMode, lazy, Suspense } from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import './index.css'
+
+// Menggunakan lazy loading agar file hanya diunduh saat dibutuhkan
+const ClassroomApp = lazy(() => import('./App3'))
+const DefaultApp = lazy(() => import('./App2'))
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      {/* Suspense wajib ada saat menggunakan lazy loading */}
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          {/* Rute untuk /classroom */}
+          <Route path="/classroom" element={<ClassroomApp />} />
+          
+          {/* Rute default (index) atau rute lain */}
+          <Route path="/" element={<DefaultApp />} />
+          
+          {/* Opsional: Rute 404 jika halaman tidak ditemukan */}
+          <Route path="*" element={<DefaultApp />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  </StrictMode>
+)
+```
+</details>
+
+### 2. Upload dist/ ke S3 bucket (dari Admin)
+Upload semua file dari folder dist/ ke S3 bucket yang sudah dibuat Admin.
+
+#### **Add Pacakge -> Set env -> Build**
+```sh
+cd apps/frontend
+# tmbahkan package
+bun add react-router-dom
+
+# Buat .env.production (atau export langsung), Pastikan url tanpa '/' di akhir
+echo "VITE_BACKEND_URL=https://FUNCTION_URL_DARI_C" > .env.production
+echo "VITE_CHECK='vite env check'" >> .env.production
+# [?] '>': Write ulang, '>>': Append
+
+bun run build
+# Output: apps/frontend/dist/
+```
+
+**Verifikasi VITE_BACKEND_URL terbake ke bundle**
+```sh
+grep -r "lambda-url.on.aws" dist/assets/
+# Harus muncul URL Lambda (VITE_BACKEND_URL) di dalam JS bundle
+# Kalau tidak muncul → build ulang, cek nama variable VITE_*
+```
+
+
+#### **Buat access Key untuk IAM**
+<details><summary>Step Buat access Key</summary>
+
+Butuh access key untuk upload kode frontend lewat CLI.
+```sh
+IAM > Users > anggota-d > Create access key
+  -> Use Case: Command Line Interface (CLI)
+  -> Desc: Frontend Access CLI Upload Code to S3 
+  -> Download .csv atau salin
+  -> Done
+```
+</details>
+
+#### **Upload via AWS CLI**
+```sh
+aws configure  # masukkan Access Key dari IAM User kamu 
+# atau: `aws configure --profile anggota-d` (sesuaikan nama)
+  # Masukkan Key ID, Secret, default region (cth: 'us-east-1'), default output 'json'
+  # Jika sudah, periksa koneksi (jika tampil file json -> STS berhasil)
+  # tambahkan `--profile anggota-d` jika bukan profile default
+aws sts get-caller-identity 
+
+# pastikan folder `apps/frontend/dist/` ada.
+# sinkronisasi bucked (upload + hapus), hanya upload file yang berubah (cache 1 tahun)
+aws s3 sync dist/ s3://s3-monorepo-frontend-prod/ --cache-control "max-age=31536000" --exclude "index.html"
+# tambahkan `--profile anggota-d` (sesuaikan nama) jika bukan default profile
+
+# Upload index.html terpisah karena tanpa cache (SPA perlu selalu fresh)
+aws s3 cp dist/index.html s3://s3-monorepo-frontend-prod/index.html   --cache-control "no-cache, no-store"
+```
+
+**Akses frontend**
+```sh
+http://s3-monorepo-frontend-prod.s3-website-us-east-1.amazonaws.com
+
+# Atau cek di: S3 → bucket → Properties → Static website hosting → Bucket website endpoint
+```
+
+> [!NOTE]
+> S3 website hosting hanya HTTP, bukan HTTPS. Cookie session.secure=true di backend 
+> TIDAK akan berfungsi dari S3 URL biasa. Ada dua solusi: 
+> (1) Nonaktifkan session.secure untuk demo, atau (2) setup CloudFront (lihat langkah berikut).
+
+**Opsional: Setup CloudFront untuk HTTPS**
+```sh
+CloudFront → Create distribution
+  Distribution name: monorepo-fe-dist
+  Origin domain: pilih S3 bucket (jangan use website endpoint)
+  Customize Cache Settings:
+    Viewer protocol policy: Redirect HTTP to HTTPS
+    Default root object: index.html
+
+Masuk ke distribution yang dibuat:
+  -> Tab Error pages → Create custom error response:
+      HTTP error code: 403 → Response path: /index.html, Response code: 200
+      HTTP error code: 404 → Response path: /index.html, Response code: 200 
+      (ini penting untuk React Router SPA)
+    
+→ Tunggu ~5 menit deploy, catat CloudFront URL (https://xxxx.cloudfront.net)
+→ Kirim ke Admin: update /monorepo/FRONTEND_URL = https://xxxx.cloudfront.net (pastikan url tanpa postfix "/")
+```
+
+- ✅ Test buka URL di browser → halaman React muncul (tampil data dari backend) (buka console Ctrl+shift+J untuk cek apa ada error)
+- ✅ Test refresh halaman di route `/classroom` → tidak 404 (SPA fallback bekerja)
+- ✅ Screenshot S3 ([*contoh]()) & CloudFront ([*contoh]()) penilaian
