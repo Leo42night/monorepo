@@ -488,7 +488,7 @@ model User {
 </details>
 
 #### 1.b. prisma/dbPostgre.ts
-<details><summary>inisiasi db khusus RDS Postgres</summary>
+<details><summary>Inisiasi db khusus RDS Postgres</summary>
 
 ```ts
 // AWS Lambda tidak bisa langsung menggunakan file SQLite, jadi kita buat file baru khusus untuk PostgreSQL yang akan digunakan di Lambda. 
@@ -659,7 +659,7 @@ Lambda → Create function → Author from scratch
   → setelah dibuat, attach policy SSM read (dari Admin)
 ```
 
-Minta admin tambahkan policy ke Role yang baru dibuat:
+**Minta admin tambahkan policy ke Role yang baru dibuat:**
 <details><summary>additionalPolicy_LambdaBE</summary>
 
 Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
@@ -721,8 +721,7 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 → Kirim URL ini ke Anggota D dan Admin
 ```
 
-- ✅ Redirect URI didapatkan: "https://FUNCTION_URL/auth/callback"
-  - Update Admin: minta update `/monorepo/GOOGLE_REDIRECT_URI` & tambahkan `GOOGLE_REDIRECT_URI` ke Google Credential Allowed Redirect URI. 
+- ✅ Redirect URI didapatkan: "https://FUNCTION_URL/auth/callback", minta admin update `/monorepo/GOOGLE_REDIRECT_URI`. 
 - ✅ Test (log):
   - Cara 1: run `aws logs tail /aws/lambda/monorepo-backend --follow` (run dulu `aws login --remote`)
   - Cara 2: CloudWatch -> Logs Insights -> search "/aws/lambda/monorepo-backend" -> Run query (jika ter block "..is not authorized to perform", salin policy actions yang dibutuhkan dan minta admin menambahkannye ke akses ke User Group `grp-lambda-be`)
