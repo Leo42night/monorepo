@@ -426,7 +426,7 @@ postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
 JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input langsung.
 ```
 
-- ✅ Screenshot RDS console (status Available) untuk penilaian
+- ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh]())
 - ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store
 
 ## Fase 4 — Anggota C: Lambda Backend (Elysia)
@@ -842,7 +842,9 @@ cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
 ### 2. Buat Lambda function di AWS Console
 Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
 
-**Buat Lambda Function**
+Proses-proses nya sebagai berikut:
+<details><summary>Buat Lambda Function</summary>
+
 ```sh
 Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
 Lambda → Create function → Author from scratch
@@ -853,9 +855,9 @@ Lambda → Create function → Author from scratch
   Execution role: "Create new role" with basic Lambda permissions
   → setelah dibuat, attach policy SSM read (dari Admin)
 ```
+</details>
 
-**Minta admin tambahkan policy ke Role yang baru dibuat:**
-<details><summary>additionalPolicy_LambdaBE</summary>
+<details><summary>Minta admin tambahkan policy ke Role yang baru dibuat</summary>
 
 Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
 ```json
@@ -877,11 +879,13 @@ Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat aks
 	]
 }
 ```
-</details>
+Beri nama `additionalPolicy_LambdaBE`
 
 **✨ Tips**: gunakan fitur search resource biar mudah
+</details>
 
-**Upload ZIP**
+<details><summary>Upload ZIP</summary>
+
 ```sh
 Lambda → Functions → [nama function]
   -> tab "Code" → Upload from → .zip file → pilih lambda-backend.zip
@@ -891,8 +895,10 @@ Lambda → Functions → [nama function]
       Memory: 512 MB (minimum untuk prisma)
       Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
 ```
+</details>
 
-**Set environment variables dari Parameter Store**
+<details><summary>Set environment variables dari Parameter Store</summary>
+
 ```sh
 Lambda → Configuration → Environment variables:
   NODE_ENV = production
@@ -900,8 +906,9 @@ Lambda → Configuration → Environment variables:
   # Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
   # dynamic load dari SSM sudah di set di config.ts
 ```
+</details>
+<details><summary>Buat Lambda Function URL</summary>
 
-**Buat Lambda Function URL**
 ```sh
 Lambda → Functions -> Masuk ke fungsi yang baru dibuat
   → tab Configuration → Function URL → Create function URL
@@ -911,6 +918,7 @@ Lambda → Functions -> Masuk ke fungsi yang baru dibuat
 → Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
 → Kirim URL ini ke Anggota D dan Admin
 ```
+</details>
 
 - ✅ Redirect URI didapatkan ("https://FUNCTION_URL/auth/callback"): minta admin update ke AWS Parameter Store `/monorepo/GOOGLE_REDIRECT_URI` & ke GCC -> API Creds -> select Name di "OAuth 2.0 Client IDs" -> tambahkan url ke Authorized redirect URIs. 
 - ✅ Test log:
@@ -1370,11 +1378,19 @@ createRoot(document.getElementById('root')!).render(
 ### 2. Upload dist/ ke S3 bucket (dari Admin)
 Upload semua file dari folder dist/ ke S3 bucket yang sudah dibuat Admin.
 
-#### **Add Pacakge -> Set env -> Build**
+#### **Test Build**
+<details><summary>Step nya</summary>
+
+**Add Pacakge -> Set env -> test di dev (berhasil) -> Build**
 ```sh
 cd apps/frontend
 # tmbahkan package
 bun add react-router-dom
+
+cd ../.. && bun install && bun dev
+## Test path "/" (tampil data dari backend)
+## Test path "/classroom" (dapat login & tampil data course classroom)
+# --- Jika berhasil, lanjut ke langkah build ---
 
 # Buat .env.production (atau export langsung), Pastikan url tanpa '/' di akhir
 echo "VITE_BACKEND_URL=https://FUNCTION_URL_DARI_C" > .env.production
@@ -1391,7 +1407,7 @@ grep -r "lambda-url.on.aws" dist/assets/
 # Harus muncul URL Lambda (VITE_BACKEND_URL) di dalam JS bundle
 # Kalau tidak muncul → build ulang, cek nama variable VITE_*
 ```
-
+</details>
 
 #### **Buat access Key untuk IAM**
 <details><summary>Step Buat access Key</summary>
@@ -1407,6 +1423,8 @@ IAM > Users > anggota-d > Create access key
 </details>
 
 #### **Upload via AWS CLI**
+<details><summary>Step Upload via CLI</summary>
+
 ```sh
 aws configure  # masukkan Access Key dari IAM User kamu 
 # atau: `aws configure --profile anggota-d` (sesuaikan nama)
@@ -1430,13 +1448,15 @@ http://s3-monorepo-frontend-prod.s3-website-us-east-1.amazonaws.com
 
 # Atau cek di: S3 → bucket → Properties → Static website hosting → Bucket website endpoint
 ```
+</details>
 
 > [!NOTE]
 > S3 website hosting hanya HTTP, bukan HTTPS. Cookie session.secure=true di backend 
-> TIDAK akan berfungsi dari S3 URL biasa. Ada dua solusi: 
-> (1) Nonaktifkan session.secure untuk demo, atau (2) setup CloudFront (lihat langkah berikut).
+> TIDAK akan berfungsi dari S3 URL biasa. kita akan setup CloudFront (lihat langkah berikut).
 
-**Opsional: Setup CloudFront untuk HTTPS**
+**Setup CloudFront untuk HTTPS**
+<details><summary>Step pasang HTTPS</summary>
+
 ```sh
 CloudFront → Create distribution
   Distribution name: monorepo-fe-dist
@@ -1454,9 +1474,10 @@ Masuk ke distribution yang dibuat:
 → Tunggu ~5 menit deploy, catat CloudFront URL (https://xxxx.cloudfront.net)
 → Kirim ke Admin: update /monorepo/FRONTEND_URL = https://xxxx.cloudfront.net (pastikan url tanpa postfix "/")
 ```
+</details>
 
 - ✅ Test buka URL di browser → halaman React muncul (tampil data dari backend) (buka console Ctrl+shift+J untuk cek apa ada error)
 - ✅ Test refresh halaman di route `/classroom` → tidak 404 (SPA fallback bekerja)
-- ✅ Screenshot S3 ([*contoh]()) & CloudFront ([*contoh]()) penilaian
+- ✅ Screenshot S3 ([*contoh](https://drive.google.com/file/d/1A8eH8WYccBpfmT8hMh_naZqVGozolMA2/view?usp=drive_link)) & CloudFront ([*contoh](https://drive.google.com/file/d/1PxAGFm4mjBCKbf0SMMbJWHLj-1QX3S8Y/view?usp=drive_link)) untuk penilaian.
 
-Fase 6 on going (harusnya gk lama)
+Fase 6 on-going (harusnya gk lama)
