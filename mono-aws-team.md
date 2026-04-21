@@ -293,8 +293,7 @@ Ini bagian dokumentasi/penilaian — tunjukkan kamu paham cara membaca cost.
 ```sh
 Billing and Cost Management -> Cost Explorer Saved Reports (Pilih "Coverage Report")
 ```
-Tugas anda adalah men-setting filter. Screenshoot pada bagian "Coverage" dan "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region. Semakin detail semakin baik.
-- ✅ Setelah modifikasi filter, simpan sebagai report baru.
+Tugas anda adalah men-setting filter. Screenshoot mencangkup bagian filter yang digunakan dan bagian "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region (seperti [*berikut](https://drive.google.com/file/d/1t3jeeoIKDKsfnut2R9PbsVqOEu1e8fh_/view?usp=drive_link), filter disembunyikan karena tugas anda untuk mencarinya). Semakin detail semakin baik.
 - ✅ Screenshoot ketika H-1 pengumpulan (supaya yang dikumpulkan adalah nilai paling update).
 
 ## Fase 3 — Anggota B: RDS Database
