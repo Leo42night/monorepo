@@ -291,7 +291,7 @@ Alert 3:
 Ini bagian dokumentasi/penilaian — tunjukkan kamu paham cara membaca cost.
 
 ```sh
-Billing and Cost Management → Cost and Usage Analysis -> Coverage Report
+Billing and Cost Management -> Cost Explorer Saved Reports (Pilih "Coverage Report")
 ```
 Tugas anda adalah men-setting filter. Screenshoot pada bagian "Coverage" dan "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region. Semakin detail semakin baik.
 - ✅ Setelah modifikasi filter, simpan sebagai report baru.
