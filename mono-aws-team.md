@@ -86,7 +86,7 @@ Add dari "User groups" (jika hanya untuk 1 Group) atau dari "Policies" (Jika dip
   Search allowed Actions -> "DescribeReport"
   Resource All (*)  
   # Lihat di JSON, kode action nya menjadi "ce:DescribeReport"
-  # tabahkan juga action "ce:GetDimensionValues", "ce:GetSavingsPlansPurchaseRecommendation" and "ce:GetSavingsPlansCoverage"
+  # tabahkan juga action "ce:GetDimensionValues", "ce:GetSavingsPlansPurchaseRecommendation", "ce:GetSavingsPlansCoverage", "ce:DeleteReport", "ce:CreateReport"
   -> Name: additionalInlinePolicy_grpBudget
 
 # AWS Lambda (fe & be) butuh butuh akses buat role & policy ketiak save lambda function.
@@ -294,6 +294,8 @@ Ini bagian dokumentasi/penilaian — tunjukkan kamu paham cara membaca cost.
 Billing and Cost Management -> Cost Explorer Saved Reports (Pilih "Coverage Report")
 ```
 Tugas anda adalah men-setting filter. Screenshoot mencangkup bagian filter yang digunakan dan bagian "Savings Plans coverage breakdown" yang menampilkan "On-Demand Spend" yang mencangkup tiap Service, Instance Family, ataupun Region (seperti [*berikut](https://drive.google.com/file/d/1t3jeeoIKDKsfnut2R9PbsVqOEu1e8fh_/view?usp=drive_link), filter disembunyikan karena tugas anda untuk mencarinya). Semakin detail semakin baik.
+
+- ✅ "Save as a new report" agar budget report dapat di pakai kembali. 
 - ✅ Screenshoot ketika H-1 pengumpulan (supaya yang dikumpulkan adalah nilai paling update).
 
 ## Fase 3 — Anggota B: RDS Database
