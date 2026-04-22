@@ -280,7 +280,7 @@ Alert 2:
 
 Alert 3 & 4:
   Threshold: 100% ($10.00)
-  Trigger: Actual
+  Trigger: Actual & Forecast
   Email: [email Admin + seluruh tim]
 ```
 </details>
