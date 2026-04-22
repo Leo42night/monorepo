@@ -795,6 +795,7 @@ Ubah `dev` dan `dev:turso` ke file `server.ts`.
 ```
 
 - ✅ Test: `cd apss/backend && bun dev`
+  - jika ada error client, coba generate ulang client `bunx --bun brisma generate`
   - `localhost:3000/users?key=learn` Tampil data.
   - `localhost:3000/auth/login` Harus buka popup Google (Jika dapat `error 400 url_mismatch`, Pastikan `http://localhost:3000/auth/callback` ada di GCC -> API -> Cred -> Client ID -> Tambahkan di list `Authorized redirect URIs`).
 </details>
@@ -813,6 +814,7 @@ bun add @aws-sdk/client-ssm @prisma/adapter-pg @elysiajs/jwt
 
 # 2. generate client menggunakan schema-postgres.prisma
 bunx prisma generate --schema prisma/schema-postgres.prisma
+## akan membuat client di `src/generated/prisma-pg`
 
 # 3. build seluruh kode di 1 file (tapi pisahkan prisma dari build code)
 ## [?] Menggunakan --target node karena kita pakai runtime "Node", bukan "Bun"
