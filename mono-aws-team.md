@@ -437,7 +437,7 @@ Lambda Node.js butuh handler function sebagai entry point. Elysia sudah export a
 ```sh
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated/prisma-pg"
   engineType = "client"
 }
 
