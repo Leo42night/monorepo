@@ -278,9 +278,9 @@ Alert 2:
   Trigger: Actual cost
   Email: [email seluruh tim]
 
-Alert 3:
+Alert 3 & 4:
   Threshold: 100% ($10.00)
-  Trigger: Actual + Forecasted
+  Trigger: Actual
   Email: [email Admin + seluruh tim]
 ```
 </details>
