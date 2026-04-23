@@ -616,16 +616,19 @@ export const createApp = (getPrisma: () => DbClient) => {
     // Middleware akses kontrol untuk /users
     .onRequest(({ request, set }) => {
       const url = new URL(request.url);
+      console.log(`[DEBUG] [${request.method}] ${url.pathname}`);
+
+      // Lewati preflight OPTIONS
+      if (request.method === "OPTIONS") return;
+
       if (!url.pathname.startsWith("/users")) return;
 
       const origin = request.headers.get("origin");
       const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
       const key = url.searchParams.get("key");
 
-      // Izinkan dari frontend resmi
       if (origin === frontendUrl) return;
 
-      // Selain itu wajib pakai API_KEY
       if (key !== process.env.API_KEY) {
         set.status = 401;
         return { message: "Unauthorized: Access denied without valid API Key" };
@@ -747,17 +750,44 @@ import { getPrisma } from "../prisma/dbPostgres"; // PostgreSQL
 let app: ReturnType<typeof createApp>;
 
 export const handler = async (event: any) => {
+  // DEBUG: log seluruh event untuk lihat apakah OPTIONS masuk
+  console.log("[EVENT] method:", event.requestContext?.http?.method);
+  console.log("[EVENT] path:", event.rawPath);
+  console.log("[EVENT] headers:", JSON.stringify(event.headers));
+
   await loadConfig(); // load SSM sekali, lalu di-cache
 
   if (!app) {
     app = createApp(getPrisma); // buat app setelah env ready
   }
 
+  // DEBUG ENV
   console.log("[DATABASE_URL]:", process.env.DATABASE_URL);
+  console.log("[FRONTEND_URL] env:", process.env.FRONTEND_URL);
+  console.log("[API_KEY] env:", process.env.API_KEY);
+  console.log("[JWT_SECRET] env:", process.env.JWT_SECRET);
 
-  const url = `https://${event.headers.host}${event.rawPath}${
-    event.rawQueryString ? "?" + event.rawQueryString : ""
-  }`;
+  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:5173";
+
+  // Handle preflight OPTIONS langsung di handler — sebelum masuk Elysia
+  // Lambda URL CORS config tidak reliable, jadi kita handle manual
+  if (event.requestContext.http.method === "OPTIONS") {
+    console.log("[OPTIONS] preflight handled for:", event.rawPath);
+    return {
+      statusCode: 204,
+      headers: {
+        "Access-Control-Allow-Origin": frontendUrl,
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "86400",
+      },
+      body: "",
+    };
+  }
+
+  const url = `https://${event.headers.host}${event.rawPath}${event.rawQueryString ? "?" + event.rawQueryString : ""
+    }`;
 
   const response = await app.handle(
     new Request(url, {
@@ -769,9 +799,26 @@ export const handler = async (event: any) => {
     })
   );
 
+  // Inject CORS headers ke semua response dari Elysia
+  const resHeaders = Object.fromEntries(response.headers);
+
+  // DEBUG — log headers sebelum inject
+  console.log("[RESPONSE] status:", response.status);
+  console.log("[RESPONSE] headers before inject:", JSON.stringify(resHeaders));
+
+  resHeaders["Access-Control-Allow-Origin"] = frontendUrl;
+  resHeaders["Access-Control-Allow-Credentials"] = "true";
+
+  // DEBUG — log headers setelah inject  
+  console.log("[RESPONSE] headers after inject:", JSON.stringify(resHeaders));
+
   return {
     statusCode: response.status,
-    headers: Object.fromEntries(response.headers),
+    headers: {
+      ...Object.fromEntries(response.headers),
+      "Access-Control-Allow-Origin": frontendUrl,
+      "Access-Control-Allow-Credentials": "true",
+    },
     body: await response.text(),
     isBase64Encoded: false,
   };
