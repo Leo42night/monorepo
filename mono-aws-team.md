@@ -47,8 +47,7 @@ aws login --remote
 </details>
 
 ## Fase 1 — Admin: IAM, VPC, Parameter Store
-Admin perlu handle issue [Aktivasi Akun untuk akses Cloudfront](https://github.com/Leo42night/monorepo/issues/4)
-
+Admin perlu handle issue aktivasi akun. Coba test dengan Create Cloudfront Distribution. Jika dapat error `You Account Must be Verified before you can add new Cloudfront resources`, lakukan [Aktivasi Akun untuk akses Cloudfront](https://github.com/Leo42night/monorepo/issues/4). Proses ini untuk dapat melakukan [Setup CloudFront untuk HTTPS](#setup-cloudfront-untuk-https)
 
 ### 1. Buat IAM Group dan User untuk tiap anggota
 Masuk ke AWS Console → IAM → Groups → Create group. Buat 4 group sesuai tugas anggota.
@@ -1502,7 +1501,7 @@ http://s3-monorepo-frontend-prod.s3-website-us-east-1.amazonaws.com
 > S3 website hosting hanya HTTP, bukan HTTPS. Cookie session.secure=true di backend 
 > TIDAK akan berfungsi dari S3 URL biasa. kita akan setup CloudFront (lihat langkah berikut).
 
-**Setup CloudFront untuk HTTPS**
+#### **Setup CloudFront untuk HTTPS**
 <details><summary>Step CloudFront pasang HTTPS</summary>
 
 ```sh
