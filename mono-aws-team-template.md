@@ -35,4 +35,4 @@ AWS Budgets → SNS → Email alerts
 ```
 
 ## Report Bug
-Laporkan jika masih menemukan bug/error. Sertakan pesan bug/error, Lokasi Bug yang ditemukan, Alur sebelum bug didapatkan, & Screenshot bila perlu. Jelaskan juga solusi yang sudah dicoba.
+Laporkan jika masih menemukan bug/error. di bagian ini cukup beri list judul dari tiap Bug saja. Detail bug masukkan ke bagian Issue agar mudah proses resolve nya nanti. Detail mencangkup: pesan bug/error, Lokasi Bug yang ditemukan, Alur sebelum bug didapatkan, & Screenshot bila perlu. Jelaskan juga solusi yang sudah dicoba.
