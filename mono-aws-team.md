@@ -47,6 +47,8 @@ aws login --remote
 </details>
 
 ## Fase 1 — Admin: IAM, VPC, Parameter Store
+Admin perlu handle issue [Aktivasi Akun untuk akses Cloudfront](https://github.com/Leo42night/monorepo/issues/4)
+
 
 ### 1. Buat IAM Group dan User untuk tiap anggota
 Masuk ke AWS Console → IAM → Groups → Create group. Buat 4 group sesuai tugas anggota.
