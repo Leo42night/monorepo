@@ -32,6 +32,7 @@ Lambda BE → Turso/LibSQL (via internet, HTTPS)
 Lambda BE → SSM Parameter Store (secret injection)
 Lambda BE → Google OAuth (redirect flow)
 AWS Budgets → SNS → Email alerts
+AWS Budgets → Cost Explorer Coverage report (tugas khusus)
 ```
 
 ## Report Bug
