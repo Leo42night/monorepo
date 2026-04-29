@@ -115,12 +115,14 @@ IAM → Users → Create user
   Console password: custom / auto-generated
   Assign to group: grp-database
   → Download credentials.csv → kirim ke anggota via chat
-# Tambahkan user dengan name "asdos", beri policy "AdministratorAccess", kirim csv lewat WA ke Asdos-Leo. 
+# Tambahkan user dengan name "asdos", beri policy "AdministratorAccess", kirim csv lewat WA ke Asdos-Leo.
 ```
 </details>
 
 > [!NOTE]
 > Kalau tim hanya 5 orang, tugaskan Client E (Integrasi) ke Client D, karena keduanya paling erat berkaitan (build frontend + verifikasi end-to-end).
+
+**Penting:** Admin Root perlu atkifkan `IAM user and role access to Billing information`. Menunya ada di [account setting](https://drive.google.com/file/d/1OGMQqj2ZUSZfcV5p0LDXJlUVU_Uyi0St/view?usp=drive_link).
 
 ### 2. Setup VPC dan Security Group
 Gunakan default **VPC** (Virtual Private Cloud) jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
