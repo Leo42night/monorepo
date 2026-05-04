@@ -8,6 +8,7 @@ AWS S3 & Cloudflare Domain (+SSL). Lanjutan PPWL11. Mengganti endpoint frontend 
 
 **Langkah:**
 - Beli domain murah di Namecheap (beri nama tim dan kelas, cth: "ppwl-a1.store" Kelas A, kelompok 1)
+- Buka domain anda di browser (cth: `ppwl.com`). Jika dapat `Whois veriﬁcation is pending`. Periksa email, jika tidak ada, klik `Didn't get the email?` di tampilan web tersebut. Aktivasi bisa dari 24 - 48 hours.
 - Daftarkan domain ke Cloudflare:
     - Login ke Cloudflare: Disarankan sign-in manual di cloudflare (nama & password), pakai OAuth sering tidak bekerja.
     - Ikuti [Tutorial](https://youtu.be/dowXP-kKw5E?si=nREc-L575VbSPPST) cara pakai nameserver Cloudflare. 
