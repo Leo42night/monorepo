@@ -1,5 +1,6 @@
 # PPWL 13
 AWS S3 & Cloudflare Domain (+SSL). Lanjutan PPWL11. Mengganti endpoint frontend dari Cloudfront ke Cloudflare. 
+
 **Cara kerja:**
 - User → HTTPS (Cloudflare SSL) → Cloudflare
 - Cloudflare → HTTP → S3
