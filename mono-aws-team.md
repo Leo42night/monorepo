@@ -1440,6 +1440,7 @@ cd ../.. && bun install && bun dev
 # --- Jika berhasil, lanjut ke langkah build ---
 
 # Buat .env.production (atau export langsung), Pastikan url tanpa '/' di akhir
+cd apps/frontend
 echo "VITE_BACKEND_URL=https://FUNCTION_URL_DARI_C" > .env.production
 echo "VITE_CHECK='vite env check'" >> .env.production
 # [?] '>': Write ulang, '>>': Append
