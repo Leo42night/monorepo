@@ -1,4 +1,4 @@
-# PPWL 13
+# PPWL 13 (Khusus yg tidak dapat akses AWS Cloudfront)
 AWS S3 & Cloudflare Domain (+SSL). Lanjutan PPWL11. Mengganti endpoint frontend dari Cloudfront ke Cloudflare. 
 
 **Cara kerja:**
