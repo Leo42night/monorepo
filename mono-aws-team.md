@@ -326,11 +326,10 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   Connectivity:
     VPC: (pilih VPC dari Admin)
     Subnet group: default
+	Public access: Yes (dapat diakses di Local & Lambda)
     VPC security group: 
       sgRdsInternal (dari Admin)
-      postgrePublic (agar dapat migrate dari local)
-    Additional configuration:
-      Public access: Yes (dapat diakses di Local & Lambda)
+      postgrePublic (agar dapat migrate dari local)  
   
   Additional configuration
     Initial database name: monorepo_prod
