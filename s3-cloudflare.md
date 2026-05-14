@@ -28,7 +28,8 @@ Tujuannya agar web dapat diakses tanpa perlu menulis prefix www
     - Enable
     - Index document: `index.html`
     - (optional) error: `index.html`
-4. Tambahkan bucket policy
+    - Simpan
+4. Masuk ke Permissions -> Tambahkan bucket policy
 <details><summary>Contoh Bucket Policy</summary>
 
 ```json
