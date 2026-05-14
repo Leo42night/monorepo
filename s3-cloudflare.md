@@ -23,7 +23,7 @@ Tujuannya agar web dapat diakses tanpa perlu menulis prefix www
 
 ### STEP 1 — Bucket utama (`www.domain.com`)
 1. Beri nama sesuai `www.domain.com` (sesuaikan domain).
-2. Block all public access: OFF (kita perlu public baca). Centang "I acknowledge that the current ... becoming public."
+2. Block all public access: OFF (kita perlu public baca). Centang "I acknowledge that the current ... becoming public.". Lalu klik "Create Bucket".
 3. Properties → Static website hosting
     - Enable
     - Index document: `index.html`
@@ -107,6 +107,8 @@ Force HTTPS:
 - Masuk: SSL/TLS → Edge Certificates
 - Aktifkan: ✅ Always Use HTTPS
 ```
+
+Jadi User akses `domain.com` -> Cloudflare (SSL) -- HTTPS --> S3 `domain.com` -- HTTP --> S3 `www.domain.site` file 
 
 ## Flow akhirnya
 buka domain anda di browser (cthL: `ppwl.com`). Jika dapat `Whois veriﬁcation is pending`. Periksa email, jika tidak ada, klik `Didn't get the email?` di tampilan web tersebut. Aktivasi bisa dari 24 - 48 hours.
