@@ -177,7 +177,6 @@ AWS Systems Manager → Parameter Store → Create parameter
 /monorepo/GOOGLE_REDIRECT_URI      → String  (isi nanti setelah Lambda URL diketahui)
 /monorepo/JWT_SECRET               → SecureString (isi bebas, auntentikasi pengganti session cookie)
 /monorepo/DATABASE_URL             → SecureString  (isi setelah Anggota B selesai RDS)
-/monorepo/DB_AUTH_TOKEN            → SecureString
 /monorepo/API_KEY                  → SecureString
 /monorepo/FRONTEND_URL             → String  (isi nanti setelah S3/CloudFront URL diketahui)
 ```
@@ -514,7 +513,6 @@ const ssm = new SSMClient({ region: "us-east-1" });
 
 const SSM_PARAMS = [
   "/monorepo/DATABASE_URL",
-  "/monorepo/DB_AUTH_TOKEN",
   "/monorepo/GOOGLE_CLIENT_ID",
   "/monorepo/GOOGLE_CLIENT_SECRET",
   "/monorepo/GOOGLE_REDIRECT_URI",
