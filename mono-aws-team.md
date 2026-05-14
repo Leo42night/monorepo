@@ -332,40 +332,162 @@ RDS → Databases → monorepo-db → Connectivity & security
 → Port: 5432
 ```
 
-### 2. Jalankan migrate ke DB baru
+**Setelah database selesai dibuat, update Parameter Store**
+```sh
+Minta Admin update parameter /monorepo/DATABASE_URL dengan value:
+postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
 
-**Setup database local**
+JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input langsung.
+```
+Simpan juga `DATABASE_URL` Postgres tersebut ke `apps/backend/.env.production`
 
-<details><summary>Step Migrate using HeidiSQL or psql CLI</summary>
+### 2. Jalankan migrate ke DB Baru
 
+#### 2.1. **Setup database local**
+
+<details><summary>**Setup database local**</summary>
+
+Anda perlu membuat file [prisma/schema-postgres.prisma](#1a-prismaschema-postgresprisma) & [prisma/db.postgre.ts](#1c-prismadbpostgrests). Pastikan database local terisi, tambahkan beberapa setting untuk dump & seeding JSON ke/dari Database.
 ```sh
 cd apps/backend
+bun add @prisma/adapter-pg
+bunx prisma generate --schema prisma/schema-postgres.prisma
+## akan membuat client di `src/generated/prisma-pg`
 
 # Jika bun belum ter-install di temrinal, run "curl -fsSL https://bun.com/install | bash"
 # Deploy migrasi ke local, dia akan membuat file "deb.db" jika tidak ada)
 bunx prisma migrate deploy
 # Seed (akan diminta menambahkan config seed: "bun run prisma/seed.ts")
 bunx prisma db seed
-
-# Ikuti Tutorial di "Aurora and RDS" -> "Databases" -> "monorepo-db" -> Connectivity & Security
-# download global key (karena AWS RDS default nya wajib koneksi SSL terenkripsi)
-mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 ```
 
-**Kirim data dari SQLite Local ke RDS PostgreSQL**
-```sh
-# copy database (create & insert) ke file sql
-cd apps/backend
-sqlite3 dev.db .dump > data.sql
-# ❌ Hapus / ubah:
-#     - PRAGMA
-#     - BEGIN TRANSACTION
-#     - COMMIT
-#     - AUTOINCREMENT → ganti jadi SERIAL
-#     - INTEGER PRIMARY KEY → jadi SERIAL PRIMARY KEY
-#! Atau Minta LLM untuk konversi ke format PostgreSQL
+Buat file `apps/backend/prisma/dump-to-json-from-sqlite.ts`:
+```ts
+import { getPrisma } from './db';
+import fs from "fs";
+import path from "path";
 
-# --- Cara 1: HeidiSQL ---
+async function dumpData() {
+  const prisma = getPrisma();
+  
+  try {
+    console.log("🚀 Memulai proses dump data...");
+
+    // 1. Ambil semua data dari setiap model secara paralel
+    const [users] = await Promise.all([
+      prisma.user.findMany()
+    ]);
+
+    // 2. Gabungkan dalam satu objek
+    const fullBackup = {
+      timestamp: new Date().toISOString(),
+      data: {
+        users: users
+      }
+    };
+
+    // 3. Tentukan lokasi penyimpanan
+    const filePath = path.resolve(__dirname, "seed_backup.json");
+
+    // 4. Tulis ke file JSON
+    fs.writeFileSync(filePath, JSON.stringify(fullBackup, null, 2), "utf-8");
+
+    console.log(`✅ Berhasil! Data disimpan di: ${filePath}`);
+    console.log(`📊 Statistik: 
+       - User: ${users.length} baris`);
+
+  } catch (error) {
+    console.error("❌ Terjadi kesalahan saat dump data:", error);
+  } finally {
+    prisma.$disconnect(); 
+  }
+}
+
+dumpData();
+```
+
+Buat file `apps/backend/prisma/seed-from-json-to-pg.ts`:
+```ts
+import { getPrisma } from './db';
+import fs from "fs";
+import path from "path";
+
+async function runSeeder() {
+  const prisma = getPrisma();
+  const filePath = path.resolve(__dirname, "seed_backup.json");
+
+  // 1. Cek apakah file backup ada
+  if (!fs.existsSync(filePath)) {
+    console.error("❌ File backup tidak ditemukan!");
+    return;
+  }
+
+  try {
+    const rawData = fs.readFileSync(filePath, "utf-8");
+    const backup = JSON.parse(rawData);
+    const { recomTarget, score, scorePrompt } = backup.data;
+
+    console.log("🚀 Memulai seeding data ke database...");
+
+    // 2. Seeding user
+    console.log("📥 Seeding RecomTarget...");
+    for (const item of recomTarget) {
+      await prisma.recomTarget.upsert({
+        where: { user_key: item.user_key },
+        update: { matkuls: item.matkuls },
+        create: {
+          user_key: item.user_key,
+          matkuls: item.matkuls,
+          createdAt: new Date(item.createdAt),
+        },
+      });
+    }
+
+    console.log("✅ Seeding selesai dengan sukses!");
+  } catch (error) {
+    console.error("❌ Gagal melakukan seeding:", error);
+  }
+}
+
+runSeeder();
+```
+
+masukkan ke `apps/backend/env.production`:
+```sh
+DATABASE_URL=postgresql://postgres:PASSWORD@monorepo-db.xxxxxxxxxx.us-east-1.rds.amazonaws.com:5432/monorepo_prod
+```
+
+Tambahkan `dev:pg` ke script `apps/backend/package.json` (ini yang paling penting):
+```json
+{
+  "scripts": {
+    "dump:sqlite": "bun --env-file=.env prisma/dump-to-json-from-sqlite.ts",
+    "seed:pg": "bun --env-file=.env.production prisma/seed-from-json-to-pg.ts"
+  }
+}
+```
+Buka terminal:
+```sh
+cd apps/backend
+bun dump:sqlite
+```
+</details>
+
+#### 2.2. **Migrasi & Seed ke AWS RDS**
+
+<details><summary>Migrasi & Seed ke AWS RDS</summary>
+
+**Pakai HeidiSQL atau psql CLI**
+```sh
+cd apps/backend
+# download global key (karena AWS RDS default nya wajib koneksi SSL terenkripsi)
+mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+# siapkan skema tabel database versi postgress
+-> di Project File, ambil skema database dari folder `apps/backend/prisma/migrations/*_init/migration.sql`.
+-> minta LLM ubah ke struktur Postgress, simpan di file `apps/backend/migrations-pg.sql`.
+
+# --- Migrasi Cara 1: HeidiSQL ---
 # Gunakan HeidiSQL untuk koneksi (untuk PhpMyAdmin kurleb config nya sama)
 "New" Session
   -> Tab "SSL", isi SSL CA certificate dengan path file 'global-bundle.pem'
@@ -377,10 +499,15 @@ sqlite3 dev.db .dump > data.sql
   -> Rename Sessions: "AWS RDS"
 
 -> Buka Session -> Database "Public"
-  -> Jalankan Query PostgreSQL
+-> jalankan query migrasi `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
 
+# buka teriminal
+cd apps/backend
+bun seed:pg
+-> Lihat isi database di HeidiSQL, tabel harusnya terisi. 
+# jika gagal, minta LLM ubah `seed_backup.json` jadi postgres, simpan ke `data.sql`, lalu run query tersebut.
 
-# --- Cara 2: psql CLI ---
+# --- Migrasi Cara 2: psql CLI ---
 # Install postgesql, contoh di archLinux (65mb)
 sudo pacman -S postgresql
 psql --version
@@ -389,27 +516,20 @@ psql --version
 export RDSHOST="monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com" 
 psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-full sslrootcert=./cert/global-bundle.pem"
 ## cth masuk ke terminal: SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off, ALPN: postgresql)
-## Tools: jika ingin keluar dari terminal postgres, run "\q" 
+## Tools: jika ingin keluar dari terminal postgres, run "\q"
 
-# Setelah data.sql jadi format PostgreSQL, dump di terminal postgres
-\i data.sql
-## cth output:
-##   monorepo_prod=> \i data.sql
-##   CREATE TABLE
-##   INSERT 0 3
+# buat file `apps/backend/migrations-pg.sql` masukkan format PostgreSQL, dump di terminal postgres
+\i migrations-pg.sql
 
-# Periksa apakah data sudah ada
+# buka teriminal
+cd apps/backend
+bun seed:pg
+# jika gagal, minta LLM ubah `seed_backup.json` jadi postgres, simpan ke `data.sql`, lalu run query tersebut.
+ 
+# Masuk lagi ke psql, Periksa apakah data sudah ada
 SELECT * FROM "User";
 ```
 </details>
-
-**Setelah selesai, update Parameter Store**
-```sh
-Minta Admin update parameter /monorepo/DATABASE_URL dengan value:
-postgresql://postgres:PASSWORD@ENDPOINT:5432/monorepo_prod
-
-JANGAN kirim password via chat terbuka — gunakan DM atau minta Admin input langsung.
-```
 
 - ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh](https://drive.google.com/file/d/1wSuy_LKIER0q7TSIzBcSq2X6nfUrb9yA/view?usp=drive_link))
 - ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store
@@ -467,7 +587,7 @@ export const getPrisma = () => {
 ```
 </details>
 
-#### 1.c. prisma/dbPostgre.ts
+#### 1.c. prisma/dbPostgres.ts
 <details><summary>Inisiasi db khusus RDS Postgres</summary>
 
 ```ts
