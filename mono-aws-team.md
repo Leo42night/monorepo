@@ -22,28 +22,18 @@ Brief Project:
 
 ## Install & Login
 
-**AWS**
+**AWS CLI**: Dipakai untuk push data kode ke AWS S3
 <details><summary>Step Instalasi AWS </summary>
 
-Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
-
+- Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
+- Config User (buat Access Key IAM anda dulu): `aws configure` (contoh di bawah)
 ```sh
-# Khusus untuk Linux/WSL
-cd ~
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-aws --version
-## Cth:
-## | [root@LeoLPC ppwl10-ec2]# aws --version
-## | aws-cli/2.34.30 Python/3.14.4 Linux/6.6.87.2-microsoft-standard-WSL2 exe/x86_64.arch
-# run `rm awscliv2.zip` untuk hapus file sisa instalasi
-
-#  setelah install AWS CLI, jalankan perintah untuk set default region (cth: `us-east-1`)
-aws configure set region us-east-1
-# Login ke AWS
-aws login --remote
+AWS Access Key ID [None]: AKIAZ3MGNLZ3MxxPxxx
+AWS Secret Access Key [None]: N+/fUo+pjg4VrWeNaBuk0eFmeEuk8egw3Yxxxxx
+Default region name [None]: us-east-1
+Default output format [None]: json
 ```
+- Cek koneksi: `aws sts get-caller-identity`
 </details>
 
 ## Fase 1 — Admin: IAM, VPC, Parameter Store
