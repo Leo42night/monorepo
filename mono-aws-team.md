@@ -324,7 +324,7 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   Storage: 20 GiB gp2
   
   Connectivity:
-    VPC: (pilih VPC dari Admin)
+    VPC: (harusnya sudah ada Default, jika tidak ada minta admin buatkan)
     Subnet group: default
 	Public access: Yes (dapat diakses di Local & Lambda)
     VPC security group: 
