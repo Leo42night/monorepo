@@ -52,6 +52,8 @@ Tujuannya agar web dapat diakses tanpa perlu menulis prefix www
 ```
 </details>
 
+5. Gunakan `AWS S3 sync ...` seperti di `mono-aws-team.md` untuk push kode ke bucket ini.
+
 ### 🔁 STEP 2 — Bucket redirect (`domain.com`)
 1. Beri nama sesuai `domain.com` (sesuaikan domain).
 2. Block all public access: OFF (kita perlu public baca). Centang "I acknowledge that the current ... becoming public.". Lalu klik "Create Bucket".
