@@ -423,14 +423,20 @@ bunx prisma generate --schema prisma/schema-postgres.prisma
 ## akan membuat client di `apps/bakckend/src/generated/prisma-pg` sesuai file `*.prisma`
 # Jika file `migrations/*.sql` migrasi belum ada. hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
-## salin isi file `*.sql` yang berisi skema. minta LLM buat versi query skema postgres (drop all index, relation & table. then create table).
+## salin isi file `*.sql` yang berisi skema. minta LLM buat versi query skema postgres.
 ## simpan sql postgres di `apps\backend\sql\skema-pg.sql`
+```
+Jika ingin reset database sebelum di-*migrate* (cegah error), tambah di awal `skema-pg.sql`:
+```sh
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA PUBLIC;
+GRANT ALL ON SCHEMA public TO CURRENT_USER;
 ```
 </details>
 
 <details><summary>Step 2: RDS HeidiSQL & Seed Postgres</summary>
 
-Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 di github](https://github.com/leokhoa/laragon/releases/tag/8.6.0) & [Dependency nya](https://drive.google.com/drive/folders/1w6Mz9eMF7XSbuu_Hc8chqfEiQondMfEK?usp=drive_link)):
+Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 wamp github](https://github.com/leokhoa/laragon/releases/tag/8.6.0) & [Dependency nya](https://drive.google.com/drive/folders/1w6Mz9eMF7XSbuu_Hc8chqfEiQondMfEK?usp=drive_link)):
 
 ```sh
 # Gunakan HeidiSQL untuk koneksi (untuk PhpMyAdmin kurleb config nya sama)
@@ -440,7 +446,10 @@ Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 di gi
     Network Type: PostgreSQL (TCP/IP)
     Library: libpq-12.dll (atau sejenis)
     Hostname: ENDPOINT (cth: monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com)
-    -> User, Password, Port isi sesuai setingan anda.
+    -> User `postgres` 
+    -> Password sesuai setingan anda.
+    -> Port `5432`
+    -> Database `monorepo_prod`
   -> Rename Sessions: "AWS RDS"
 
 -> Buka Session -> Database "Public"
@@ -467,7 +476,7 @@ bunx prisma db seed
 bun seed:pg
 ```
 
-Gunakan [SQLite3](#sqlite3) Untuk melihat isi `dev.db` & Lihat di HeidiSQL untuk isi RDS Postgres.
+Gunakan [SQLite3](#sqlite3) Untuk melihat isi `dev.db` & Lihat di HeidiSQL untuk isi Postgres.
 
 </details>
 
