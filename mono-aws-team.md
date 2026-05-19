@@ -308,17 +308,17 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   Template: Sandbox  ← PENTING untuk Free Tier single-AZ
   DB instance identifier: monorepo-db
   Master username: postgres
-  Master password: (simpan baik-baik, jangan pakai simbol: !$"'")
+  Master password: (jangan pakai simbol: `!$@"'`, disarankan pakai huruf dan angka saja, simpan baik-baik)
   DB instance class: db.t3.micro
   Storage: 20 GiB gp2
   
   Connectivity:
     VPC: (harusnya sudah ada Default, jika tidak ada minta admin buatkan)
     Subnet group: default
-	Public access: Yes (dapat diakses di Local & Lambda)
+	Public access: Yes (dapat diakses di Local)
     VPC security group: 
-      sgRdsInternal (dari Admin)
-      postgrePublic (agar dapat migrate dari local)  
+      sgRdsInternal (dari Admin, dapat diakses aws Lambda)
+      postgrePublic (dari Admin, agar dapat migrate dari local)  
   
   Additional configuration
     Initial database name: monorepo_prod
@@ -343,151 +343,96 @@ Simpan juga `DATABASE_URL` Postgres tersebut ke `apps/backend/.env.production`
 
 ### 2. Jalankan migrate ke DB Baru
 
-#### 2.1. **Setup database local**
+#### 2.1. **Setup File**
 
-<details><summary>**Setup database local**</summary>
+<details><summary>Step Setup database local</summary>
 
-Anda perlu membuat file [prisma/schema-postgres.prisma](#1a-prismaschema-postgresprisma) & [prisma/db.postgre.ts](#1c-prismadbpostgrests). Pastikan database local terisi, tambahkan beberapa setting untuk dump & seeding JSON ke/dari Database.
+Tambahkan `NODE_ENV=dev` ke file `apps\backend\.env`.
+
+Perbaiki file [prisma/db.ts](#1b-prismadbts). Buat file [prisma/schema-postgres.prisma](#1a-prismaschema-postgresprisma) & [prisma/dbPostgre.ts](#1c-prismadbpostgrests).
+
+Ubah file `apps\backend\prisma\seed.ts`:
+```ts
+let prisma: any;
+
+async function initializeDatabase() {
+  if (process.env.NODE_ENV === "dev") {
+    const { getPrisma: localDb, dbUrl } = await import("./db");
+    prisma = localDb();
+    console.log("dbUrl", dbUrl);
+  } else {
+    const { getPrisma: prodDb } = await import("./dbPostgres");
+    prisma = prodDb();
+  } 
+}
+
+async function main() {
+  await initializeDatabase();
+  console.log("Memulai proses seeding data dummy...");
+
+  await prisma.user.deleteMany({});
+
+  // =========================
+  // USERS
+  // =========================
+  const userA = await prisma.user.create({
+    data: {
+      name: "User A",
+      email: "a@mail.com",
+    },
+  });
+
+  const userB = await prisma.user.create({
+    data: {
+      name: "User B",
+      email: "b@mail.com",
+    },
+  });
+
+  const userC = await prisma.user.create({
+    data: {
+      name: "User C",
+      email: "c@mail.com",
+    },
+  });
+
+  console.log("Seeding selesai 🚀");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    if (prisma) {
+      await prisma.$disconnect();
+    }
+  });
+```
+</details>
+
+#### 2.2. **Migrasi & Seed (local & AWS RDS)**
+
+<details><summary>**Step 1: Setup Migrasi Local DB & SQL Postgress**</summary>
+
 ```sh
 cd apps/backend
 bun add @prisma/adapter-pg
 bunx prisma generate --schema prisma/schema-postgres.prisma
-## akan membuat client di `src/generated/prisma-pg`
-
-# Jika bun belum ter-install di temrinal, run "curl -fsSL https://bun.com/install | bash"
-# Deploy migrasi ke local, dia akan membuat file "deb.db" jika tidak ada)
-bunx prisma migrate deploy
-# Seed (akan diminta menambahkan config seed: "bun run prisma/seed.ts")
-bunx prisma db seed
-```
-
-Buat file `apps/backend/prisma/dump-to-json-from-sqlite.ts`:
-```ts
-import { getPrisma } from './db';
-import fs from "fs";
-import path from "path";
-
-async function dumpData() {
-  const prisma = getPrisma();
-  
-  try {
-    console.log("🚀 Memulai proses dump data...");
-
-    // 1. Ambil semua data dari setiap model secara paralel
-    const [users] = await Promise.all([
-      prisma.user.findMany()
-    ]);
-
-    // 2. Gabungkan dalam satu objek
-    const fullBackup = {
-      timestamp: new Date().toISOString(),
-      data: {
-        users: users
-      }
-    };
-
-    // 3. Tentukan lokasi penyimpanan
-    const filePath = path.resolve(__dirname, "seed_backup.json");
-
-    // 4. Tulis ke file JSON
-    fs.writeFileSync(filePath, JSON.stringify(fullBackup, null, 2), "utf-8");
-
-    console.log(`✅ Berhasil! Data disimpan di: ${filePath}`);
-    console.log(`📊 Statistik: 
-       - User: ${users.length} baris`);
-
-  } catch (error) {
-    console.error("❌ Terjadi kesalahan saat dump data:", error);
-  } finally {
-    prisma.$disconnect(); 
-  }
-}
-
-dumpData();
-```
-
-Buat file `apps/backend/prisma/seed-from-json-to-pg.ts`:
-```ts
-import { getPrisma } from './db';
-import fs from "fs";
-import path from "path";
-
-async function runSeeder() {
-  const prisma = getPrisma();
-  const filePath = path.resolve(__dirname, "seed_backup.json");
-
-  // 1. Cek apakah file backup ada
-  if (!fs.existsSync(filePath)) {
-    console.error("❌ File backup tidak ditemukan!");
-    return;
-  }
-
-  try {
-    const rawData = fs.readFileSync(filePath, "utf-8");
-    const backup = JSON.parse(rawData);
-    const { recomTarget, score, scorePrompt } = backup.data;
-
-    console.log("🚀 Memulai seeding data ke database...");
-
-    // 2. Seeding user
-    console.log("📥 Seeding RecomTarget...");
-    for (const item of recomTarget) {
-      await prisma.recomTarget.upsert({
-        where: { user_key: item.user_key },
-        update: { matkuls: item.matkuls },
-        create: {
-          user_key: item.user_key,
-          matkuls: item.matkuls,
-          createdAt: new Date(item.createdAt),
-        },
-      });
-    }
-
-    console.log("✅ Seeding selesai dengan sukses!");
-  } catch (error) {
-    console.error("❌ Gagal melakukan seeding:", error);
-  }
-}
-
-runSeeder();
-```
-
-masukkan ke `apps/backend/env.production`:
-```sh
-DATABASE_URL=postgresql://postgres:PASSWORD@monorepo-db.xxxxxxxxxx.us-east-1.rds.amazonaws.com:5432/monorepo_prod
-```
-
-Tambahkan `dev:pg` ke script `apps/backend/package.json` (ini yang paling penting):
-```json
-{
-  "scripts": {
-    "dump:sqlite": "bun --env-file=.env prisma/dump-to-json-from-sqlite.ts",
-    "seed:pg": "bun --env-file=.env.production prisma/seed-from-json-to-pg.ts"
-  }
-}
-```
-Buka terminal:
-```sh
-cd apps/backend
-bun dump:sqlite
+## akan membuat client di `apps/bakckend/src/generated/prisma-pg` sesuai file `*.prisma`
+# Jika file `migrations/*.sql` migrasi belum ada. hapus `dev.db` & `migrations/`, run ulang migrasi.
+bunx prisma migrate dev --name init
+## salin isi file `*.sql` yang berisi skema. minta LLM buat versi query skema postgres (drop all index, relation & table. then create table).
+## simpan sql postgres di `apps\backend\sql\skema-pg.sql`
 ```
 </details>
 
-#### 2.2. **Migrasi & Seed ke AWS RDS**
+<details><summary>**Step 2: RDS HeidiSQL & Seed Postgres**</summary>
 
-<details><summary>Migrasi & Seed ke AWS RDS</summary>
+Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 di github](https://github.com/leokhoa/laragon/releases/tag/8.6.0) & [Dependency nya](https://drive.google.com/drive/folders/1w6Mz9eMF7XSbuu_Hc8chqfEiQondMfEK?usp=drive_link)):
 
-**Pakai HeidiSQL atau psql CLI**
 ```sh
-cd apps/backend
-# download global key (karena AWS RDS default nya wajib koneksi SSL terenkripsi)
-mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-
-# siapkan skema tabel database versi postgress
--> di Project File, ambil skema database dari folder `apps/backend/prisma/migrations/*_init/migration.sql`.
--> minta LLM ubah ke struktur Postgress, simpan di file `apps/backend/migrations-pg.sql`.
-
-# --- Migrasi Cara 1: HeidiSQL ---
 # Gunakan HeidiSQL untuk koneksi (untuk PhpMyAdmin kurleb config nya sama)
 "New" Session
   -> Tab "SSL", isi SSL CA certificate dengan path file 'global-bundle.pem'
@@ -500,39 +445,34 @@ mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazo
 
 -> Buka Session -> Database "Public"
 -> jalankan query migrasi `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
-
-# buka teriminal
-cd apps/backend
-bun seed:pg
--> Lihat isi database di HeidiSQL, tabel harusnya terisi. 
-# jika gagal, minta LLM ubah `seed_backup.json` jadi postgres, simpan ke `data.sql`, lalu run query tersebut.
-
-# --- Migrasi Cara 2: psql CLI ---
-# Install postgesql, contoh di archLinux (65mb)
-sudo pacman -S postgresql
-psql --version
-# cth output: psql (PostgreSQL) 18.3
-
-export RDSHOST="monorepo-db.c8nscaw0oxxx.us-east-1.rds.amazonaws.com" 
-psql "host=$RDSHOST port=5432 dbname=monorepo_prod user=postgres sslmode=verify-full sslrootcert=./cert/global-bundle.pem"
-## cth masuk ke terminal: SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off, ALPN: postgresql)
-## Tools: jika ingin keluar dari terminal postgres, run "\q"
-
-# buat file `apps/backend/migrations-pg.sql` masukkan format PostgreSQL, dump di terminal postgres
-\i migrations-pg.sql
-
-# buka teriminal
-cd apps/backend
-bun seed:pg
-# jika gagal, minta LLM ubah `seed_backup.json` jadi postgres, simpan ke `data.sql`, lalu run query tersebut.
- 
-# Masuk lagi ke psql, Periksa apakah data sudah ada
-SELECT * FROM "User";
 ```
+
+Masukkan ke `apps/backend/env.production`:
+```sh
+DATABASE_URL=postgresql://postgres:PASSWORD@monorepo-db.xxxxxxxxxx.us-east-1.rds.amazonaws.com:5432/monorepo_prod
+```
+
+Tambahkan `seed:pg` ke script `apps/backend/package.json`:
+```json
+{
+  "scripts": {
+    "seed:pg": "bun --env-file=.env.production prisma/seed.ts"
+  }
+}
+```
+
+Jalankan Seed ke dev.db dan Postgres:
+```sh
+bunx prisma db seed
+bun seed:pg
+```
+
+Gunakan [SQLite3](#sqlite3) Untuk melihat isi DB & Lihat di HeidiSQL untuk isi Postgres.
+
 </details>
 
-- ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh](https://drive.google.com/file/d/1wSuy_LKIER0q7TSIzBcSq2X6nfUrb9yA/view?usp=drive_link))
-- ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store
+- ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh](https://drive.google.com/file/d/1wSuy_LKIER0q7TSIzBcSq2X6nfUrb9yA/view?usp=drive_link)).
+- ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store.
 
 ## Fase 4 — Anggota C: Lambda Backend (Elysia)
 Mulai setelah Admin selesai Parameter Store, dan Anggota B update DATABASE_URL
@@ -545,7 +485,7 @@ Lambda Node.js butuh handler function sebagai entry point. Elysia sudah export a
 #### 1.a. prisma/schema-postgres.prisma
 <details><summary>Skema khusus postgres</summary>
 
-```sh
+```
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma-pg"
@@ -598,9 +538,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import fs from "fs";
 import path from "path";
 
-const ca = fs.readFileSync(
-  path.join(process.cwd(), "cert/global-bundle.pem")
-).toString();
+const certPath = path.join(process.cwd(), "cert/global-bundle.pem");
+console.log("Looking for cert at:", certPath);
+console.log("File exists:", fs.existsSync(certPath));
+console.log("DATABASE_URL:", process.env.DATABASE_URL!)
+
+const ca = fs.readFileSync(certPath).toString();
 
 // Kita buat singleton Prisma Client agar dipanggil ketika SSM sudah siap, dan tidak dibuat ulang setiap kali handler dipanggil (karena Lambda bisa reuse container).
 let prisma: PrismaClient;
@@ -1690,3 +1633,35 @@ Publish kode ke github repo & gunakan template  `mono-aws-team-template.md` untu
 Urutan ketergantungan antar anggota yang perlu diperhatikan tim:
 - Admin harus selesai dulu karena seluruh anggota butuh IAM credentials, Security Group, dan Parameter Store sebelum bisa mulai. **A_Budget** adalah satu-satunya yang bisa langsung jalan paralel sejak pagi karena tidak bergantung siapa pun.
 - Dua titik sinkronisasi kritis di tengah hari: **B_Database** harus **C_Backend** setelah `DATABASE_URL` dimasukkan ke Parameter Store, dan **C_Backend** harus kirim Lambda Function URL ke **D_Frontend** sebelum D menjalankan `vite build` — karena URL itu di-bake ke dalam bundle JavaScript saat build time, bukan runtime.
+
+---
+Kumpulan Tips
+
+## SQLite3
+Untuk kelola database sqlite (dev).
+
+### 1. Instalasi
+*   **Windows**: Unduh **sqlite-tools** dari [sqlite.org](https://sqlite.org). Ekstrak file `.exe` ke sebuah folder (misal `C:\sqlite`), lalu daftarkan folder tersebut ke **Environment Variables (PATH)** sistem Anda.
+*   **macOS**: Jalankan `brew install sqlite` via Homebrew (atau gunakan versi bawaan mac).
+*   **Linux (Ubuntu/Debian)**: Jalankan `sudo apt update && sudo apt install sqlite3`.
+
+### 2. Membuka Database & Mengatur Format
+Masuk ke direktori tempat database berada melalui terminal, lalu jalankan perintah berikut:
+```bash
+sqlite3 dev.db
+```
+Setelah masuk ke *prompt* `sqlite>`, ketik dua perintah ini agar tampilan data rapi berbentuk tabel:
+```sqlite
+.mode table
+.headers on
+```
+
+### 3. Perintah Navigasi Utama
+*   **Melihat daftar tabel:** `.tables`
+*   **Melihat skema/struktur tabel:** `.schema nama_tabel`
+*   **Keluar dari aplikasi:** `.exit`
+
+### 4. Contoh Query SQL Populer
+*   **Lihat seluruh isi data:** `SELECT * FROM Feedback;`
+*   **Lihat 5 data terbaru:** `SELECT * FROM RecomTarget ORDER BY createdAt DESC LIMIT 5;`
+*   **Hapus semua isi tabel:** `DELETE FROM Score;`
