@@ -1561,7 +1561,7 @@ aws sts get-caller-identity
 
 # pastikan folder `apps/frontend/dist/` ada.
 # sinkronisasi bucked (upload + hapus), hanya upload file yang berubah (cache 1 tahun)
-aws s3 sync dist/ s3://s3-monorepo-frontend-prod/ --cache-control "max-age=31536000" --exclude "index.html"
+aws s3 sync dist/ s3://s3-monorepo-frontend-prod/ --cache-control "max-age=31536000" --exclude "index.html" --delete
 # tambahkan `--profile anggota-d` (sesuaikan nama) jika bukan default profile
 
 # Upload index.html terpisah karena tanpa cache (SPA perlu selalu fresh)
