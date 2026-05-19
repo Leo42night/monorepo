@@ -414,7 +414,7 @@ main()
 
 #### 2.2. **Migrasi & Seed (local & AWS RDS)**
 
-<details><summary>**Step 1: Setup Migrasi Local DB & SQL Postgress**</summary>
+<details><summary>Step 1: Setup Migrasi Local DB & SQL Postgress</summary>
 
 ```sh
 cd apps/backend
@@ -428,7 +428,7 @@ bunx prisma migrate dev --name init
 ```
 </details>
 
-<details><summary>**Step 2: RDS HeidiSQL & Seed Postgres**</summary>
+<details><summary>Step 2: RDS HeidiSQL & Seed Postgres</summary>
 
 Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 di github](https://github.com/leokhoa/laragon/releases/tag/8.6.0) & [Dependency nya](https://drive.google.com/drive/folders/1w6Mz9eMF7XSbuu_Hc8chqfEiQondMfEK?usp=drive_link)):
 
@@ -467,7 +467,7 @@ bunx prisma db seed
 bun seed:pg
 ```
 
-Gunakan [SQLite3](#sqlite3) Untuk melihat isi DB & Lihat di HeidiSQL untuk isi Postgres.
+Gunakan [SQLite3](#sqlite3) Untuk melihat isi `dev.db` & Lihat di HeidiSQL untuk isi RDS Postgres.
 
 </details>
 
