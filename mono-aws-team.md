@@ -308,7 +308,7 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   Template: Sandbox  ← PENTING untuk Free Tier single-AZ
   DB instance identifier: monorepo-db
   Master username: postgres
-  Master password: (jangan pakai simbol: `!$@"'`, disarankan pakai huruf dan angka saja, simpan baik-baik)
+  Master password: (jangan pakai simbol !$@"'`, disarankan pakai huruf dan angka saja, simpan baik-baik)
   DB instance class: db.t3.micro
   Storage: 20 GiB gp2
   
@@ -345,13 +345,39 @@ Simpan juga `DATABASE_URL` Postgres tersebut ke `apps/backend/.env.production`
 
 #### 2.1. **Setup File**
 
-<details><summary>Step Setup database local</summary>
-
 Tambahkan `NODE_ENV=dev` ke file `apps\backend\.env`.
 
 Perbaiki file [prisma/db.ts](#1b-prismadbts). Buat file [prisma/schema-postgres.prisma](#1a-prismaschema-postgresprisma) & [prisma/dbPostgre.ts](#1c-prismadbpostgrests).
 
-Ubah file `apps\backend\prisma\seed.ts`:
+<details><summary>apps\backend\prisma.config.ts</summary>
+
+```ts
+import { defineConfig } from "prisma/config";
+
+const dbUrl = process.env.DATABASE_URL || "file:./dev.db";
+const schema = dbUrl.startsWith("postgre") ? "prisma/schema-postgres.prisma" : "prisma/schema.prisma";
+
+// --- LOG UNTUK DEBUGGING ---
+console.log("==========================================");
+console.log("DATABASE_URL :", process.env.DATABASE_URL);
+console.log("Skema        :", schema);
+console.log("==========================================");
+
+export default defineConfig({
+  schema: schema,
+  migrations: {
+    path: "prisma/migrations",
+    seed: "bun run prisma/seed.ts"
+  },
+  datasource: {
+    url: dbUrl,
+  },
+});
+```
+</details>
+
+<details><summary>apps\backend\prisma\seed.ts</summary>
+
 ```ts
 let prisma: any;
 
@@ -372,9 +398,6 @@ async function main() {
 
   await prisma.user.deleteMany({});
 
-  // =========================
-  // USERS
-  // =========================
   const userA = await prisma.user.create({
     data: {
       name: "User A",
@@ -414,27 +437,19 @@ main()
 
 #### 2.2. **Migrasi & Seed (local & AWS RDS)**
 
-<details><summary>Step 1: Setup Migrasi Local DB & SQL Postgress</summary>
+<details><summary>Step 1: CLI Command Migrasi & Generate Client</summary>
 
 ```sh
 cd apps/backend
-bun add @prisma/adapter-pg
+bun add @prisma/adapter-pg     
 bunx prisma generate --schema prisma/schema-postgres.prisma
 ## akan membuat client di `apps/bakckend/src/generated/prisma-pg` sesuai file `*.prisma`
-# Jika file `migrations/*.sql` migrasi belum ada. hapus `dev.db` & `migrations/`, run ulang migrasi.
+# Jika migrasi gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
-## salin isi file `*.sql` yang berisi skema. minta LLM buat versi query skema postgres.
-## simpan sql postgres di `apps\backend\sql\skema-pg.sql`
-```
-Jika ingin reset database sebelum di-*migrate* (cegah error), tambah di awal `skema-pg.sql`:
-```sh
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA PUBLIC;
-GRANT ALL ON SCHEMA public TO CURRENT_USER;
 ```
 </details>
 
-<details><summary>Step 2: RDS HeidiSQL & Seed Postgres</summary>
+<details><summary>Step 2: RDS HeidiSQL, Migrate & Seed Postgres</summary>
 
 Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 wamp github](https://github.com/leokhoa/laragon/releases/tag/8.6.0) & [Dependency nya](https://drive.google.com/drive/folders/1w6Mz9eMF7XSbuu_Hc8chqfEiQondMfEK?usp=drive_link)):
 
@@ -470,8 +485,12 @@ Tambahkan `seed:pg` ke script `apps/backend/package.json`:
 }
 ```
 
-Jalankan Seed ke dev.db dan Postgres:
+Run Perintah:
 ```sh
+# Migrate skema ke RDS Postgres
+bun --env-file=.env.production prisma db push --force-reset
+
+# seed ke `dev.db` dan Postgres
 bunx prisma db seed
 bun seed:pg
 ```
@@ -550,7 +569,7 @@ import path from "path";
 const certPath = path.join(process.cwd(), "cert/global-bundle.pem");
 console.log("Looking for cert at:", certPath);
 console.log("File exists:", fs.existsSync(certPath));
-console.log("DATABASE_URL:", process.env.DATABASE_URL!)
+console.log("DATABASE_URL:", process.env.DATABASE_URL!);
 
 const ca = fs.readFileSync(certPath).toString();
 
