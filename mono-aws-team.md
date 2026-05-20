@@ -934,32 +934,35 @@ Ubah `dev` dan `dev:turso` ke file `server.ts`.
 
 ```sh
 cd apps/backend
-# 1. Install bebrapa dependency baru
+# 0. Install bebrapa dependency baru
 ## aws untuk elysia dapat baca env vars di SSM
 ## adapter-pg utnuk code client Postgres DB
 ## JWT untuk metode autentikasi baru  
 bun add @aws-sdk/client-ssm @prisma/adapter-pg @elysiajs/jwt
 
-# 2. generate client menggunakan schema-postgres.prisma
-bunx prisma generate --schema prisma/schema-postgres.prisma
+# 1. generate client menggunakan schema-pg.prisma (lambda butuh ini)
+cd apps/backend && bunx prisma generate --schema prisma/schema-pg.prisma
 ## akan membuat client di `src/generated/prisma-pg`
 
-# 3. build seluruh kode di 1 file (tapi pisahkan prisma dari build code)
+# 2. build seluruh kode di 1 file (tapi pisahkan prisma dari build code)
 ## [?] Menggunakan --target node karena kita pakai runtime "Node", bukan "Bun"
 ## [?] --format cjs, Common JS. mengganti ESM 'import.meta', jadi CJS 'require'
 bun build src/lambda.ts --outdir dist-lambda --target node --format cjs --external prisma
 
-# 4. copy Generated Prisma Client (postgres), dependency, & certificate
-cp -r src/generated/prisma-pg dist-lambda/generated/prisma-pg
+# 3. copy Generated Prisma Client (postgres), dependency, & certificate
+## Versi Windows CMD
+xcopy /s /i /e src\generated\prisma-pg dist-lambda\generated\prisma-pg
+## -- jika SSH key belum ada --
+if not exist cert mkdir cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+### -- masukkan SSH & node_modules/.prisma ke folder dist-lambda/ -- 
+if not exist "dist-lambda\cert" mkdir "dist-lambda\cert" && xcopy /y "cert\global-bundle.pem" "dist-lambda\cert\"
 
-# jika SSH key belum ada
-mkdir -p cert && curl -o cert/global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-
-mkdir -p dist-lambda/cert && cp cert/global-bundle.pem dist-lambda/cert
-cp -r node_modules/.prisma dist-lambda/node_modules/.prisma 2>/dev/null || true
-
-# 5. ZIP untuk upload (38MB -> 3.8MB) (install zip, cth di archLinux: `pacmap -S zip`)
-cd dist-lambda && zip -r ../lambda-backend.zip . && cd ..
+# 4. Zipping & UP ke Lambda
+### Zipping untuk upload (10MB -> 3.8MB)
+cd dist-lambda && powershell -NoProfile -Command "Compress-Archive -Path * -DestinationPath ../lambda-backend.zip -Force" && cd ..
+## up zip kode pakai AWS CLI ke lambda, lalu tambahkan env yang diperlukan 
+aws lambda update-function-code --function-name monorepo-backend --zip-file fileb://lambda-backend.zip
+aws lambda update-function-configuration --function-name monorepo-backend --environment "Variables={NODE_ENV=production}"
 ```
 </details>
 
