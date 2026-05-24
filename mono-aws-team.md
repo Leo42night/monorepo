@@ -26,7 +26,7 @@ Brief Project:
 <details><summary>Step Instalasi AWS </summary>
 
 - Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
-- Config User (buat Access Key IAM anda dulu): `aws configure` (contoh di bawah)
+- [#### Buat access Key untuk IAM](buat-access-key-untuk-iam.md) anda dulu lalu jalankan `aws configure` (contoh di bawah)
 ```sh
 AWS Access Key ID [None]: AKIAZ3MGNLZ3MxxPxxx
 AWS Secret Access Key [None]: N+/fUo+pjg4VrWeNaBuk0eFmeEuk8egw3Yxxxxx
@@ -1538,7 +1538,7 @@ grep -r "lambda-url.on.aws" dist/assets/
 ```
 </details>
 
-#### **Buat access Key untuk IAM**
+#### Buat access Key untuk IAM
 <details><summary>Step Buat access Key</summary>
 
 Butuh access key untuk upload kode frontend lewat CLI.
