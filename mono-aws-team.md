@@ -447,7 +447,7 @@ bunx prisma generate --schema prisma/schema-postgres.prisma
 # Jika migrasi gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
 ```
-Ambil isi file migrations sql di backend yg berisi query "CREATE TABLE...", salin ke LLM, *buat versi postgres* simpan ke file `migrations-pg.sql`
+cara-1-migrasi: Ambil isi file migrations sql di backend yg berisi query "CREATE TABLE...", salin ke LLM, *buat versi postgres* simpan ke file `migrations-pg.sql`
 </details>
 
 <details><summary>Step 2: RDS HeidiSQL, Migrate & Seed Postgres</summary>
@@ -469,7 +469,7 @@ Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 wamp 
   -> Rename Sessions: "AWS RDS" -> SIMPAN
 
 -> Buka Session -> Database "Public"
--> jalankan query migrasi `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
+-> jalankan query migrasi (cara-1-migrasi) `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
 ```
 
 Masukkan ke `apps/backend/env.production`:
@@ -485,10 +485,11 @@ Tambahkan `seed:pg` ke script `apps/backend/package.json`:
   }
 }
 ```
+</details>
 
 Run Perintah:
 ```sh
-# Migrate skema ke RDS Postgres
+# cara-2-migrasi skema database ke RDS Postgres
 bun --env-file=.env.production prisma db push --force-reset
 
 # seed ke `dev.db` dan Postgres
@@ -497,8 +498,6 @@ bun seed:pg
 ```
 
 Gunakan [SQLite3](#sqlite3) Untuk melihat isi `dev.db` & Lihat di HeidiSQL untuk isi Postgres.
-
-</details>
 
 - ✅ Screenshot RDS console (status Available) untuk penilaian ([*contoh](https://drive.google.com/file/d/1wSuy_LKIER0q7TSIzBcSq2X6nfUrb9yA/view?usp=drive_link)).
 - ✅ Kabari Anggota C bahwa `DATABASE_URL` sudah di Parameter Store.
