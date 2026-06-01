@@ -119,7 +119,7 @@ IAM → Users → Create user
 Gunakan default **VPC** (Virtual Private Cloud) jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
 
 **Buat Security Group untuk RDS**
-<details><summary>Step SG RDS Internal </summary>
+<details><summary>Step SG RDS Internal (sgRdsInternal)</summary>
 
 ```sh
 VPC → Security Groups → Create security group
@@ -152,7 +152,7 @@ Desc: Security group for Lambda functions to access RDS and external APIs
 > Setelah `sgLambda` terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
 
 **Buat Security untuk Postgres public**
-<details><summary>Step SG Postgre Public</summary>
+<details><summary>Step SG Postgre Public (postgrePublic)</summary>
 
 Dipakai untuk migrate database dari local, dan dapat di akses.
 ```sh
@@ -447,6 +447,7 @@ bunx prisma generate --schema prisma/schema-postgres.prisma
 # Jika migrasi gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
 ```
+Ambil isi file migrations sql di backend yg berisi query "CREATE TABLE...", salin ke LLM, *buat versi postgres* simpan ke file `migrations-pg.sql`
 </details>
 
 <details><summary>Step 2: RDS HeidiSQL, Migrate & Seed Postgres</summary>
