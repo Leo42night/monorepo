@@ -298,7 +298,7 @@ Mulai setelah Admin selesai VPC & Security Group
 Buat RDS PostgreSQL Free Tier (lebih aman dari sisi biaya).
 
 **RDS PostgreSQL (Free Tier)**
-<details><summary>Step add Databse</summary>
+<details><summary>Step add Database</summary>
 
 ```sh
 Region "us-east-1"
@@ -465,7 +465,7 @@ Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 wamp 
     -> Password sesuai setingan anda.
     -> Port `5432`
     -> Database `monorepo_prod`
-  -> Rename Sessions: "AWS RDS"
+  -> Rename Sessions: "AWS RDS" -> SIMPAN
 
 -> Buka Session -> Database "Public"
 -> jalankan query migrasi `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
@@ -964,6 +964,8 @@ cd dist-lambda && powershell -NoProfile -Command "Compress-Archive -Path * -Dest
 aws lambda update-function-code --function-name monorepo-backend --zip-file fileb://lambda-backend.zip
 aws lambda update-function-configuration --function-name monorepo-backend --environment "Variables={NODE_ENV=production}"
 ```
+Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
+dynamic load dari SSM sudah di set di config.ts
 </details>
 
 ### 2. Buat Lambda function di AWS Console
@@ -1011,11 +1013,11 @@ Beri nama `additionalPolicy_LambdaBE`
 **✨ Tips**: gunakan fitur search resource biar mudah
 </details>
 
-<details><summary>Upload ZIP</summary>
+<details><summary>Config  Lambda</summary>
 
 ```sh
 Lambda → Functions → [nama function]
-  -> tab "Code" → Upload from → .zip file → pilih lambda-backend.zip
+  -> tab "Code"
     -> Runtime Settings -> Edit
       Handler: lambda.handler
   -> tab "Configuration" -> Edit
@@ -1024,16 +1026,6 @@ Lambda → Functions → [nama function]
 ```
 </details>
 
-<details><summary>Set environment variables dari Parameter Store</summary>
-
-```sh
-Lambda → Configuration → Environment variables:
-  NODE_ENV = production
-  
-  # Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
-  # dynamic load dari SSM sudah di set di config.ts
-```
-</details>
 <details><summary>Buat Lambda Function URL</summary>
 
 ```sh
