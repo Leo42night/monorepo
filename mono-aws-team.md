@@ -942,9 +942,25 @@ Lambda → Create function → Author from scratch
   Architecture: x86_64
  -> CREATE
 
- -> Tab "Configuration" -> Permissions -> Execution role "Edit"
-  Execution role: "Create new role" with basic Lambda permissions
-  → setelah dibuat, attach policy SSM read (dari Admin)
+Lambda → Functions → [nama function]
+  -> tab "Code"
+    -> Runtime Settings -> Edit
+      Handler: lambda.handler
+  
+  -> tab "Configuration" -> Edit
+      Memory: 512 MB (minimum untuk prisma)
+      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
+  
+  → tab Configuration → Function URL → Create function URL
+    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
+    CORS: Disabled (CORS di-handle manual dari kode Elysia)
+
+	# Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
+	# Kirim URL ini ke Anggota D dan Admin
+
+  -> Tab "Configuration" -> Permissions -> Execution role "Edit"
+    Execution role: "Create new role" with basic Lambda permissions
+    → setelah dibuat, attach policy SSM read (dari Admin)
 ```
 </details>
 
@@ -973,27 +989,6 @@ Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat aks
 Beri nama `additionalPolicy_LambdaBE`
 
 **✨ Tips**: gunakan fitur search resource biar mudah
-</details>
-
-<details><summary>Setep Config Lambda</summary>
-
-```sh
-Lambda → Functions → [nama function]
-  -> tab "Code"
-    -> Runtime Settings -> Edit
-      Handler: lambda.handler
-  
-  -> tab "Configuration" -> Edit
-      Memory: 512 MB (minimum untuk prisma)
-      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
-  
-  → tab Configuration → Function URL → Create function URL
-    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
-    CORS: Disabled (CORS di-handle manual dari kode Elysia)
-
-→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
-→ Kirim URL ini ke Anggota D dan Admin
-```
 </details>
 
 #### 3. Build & Upload ke Backend Lambda
