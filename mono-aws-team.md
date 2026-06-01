@@ -444,7 +444,7 @@ cd apps/backend
 bun add @prisma/adapter-pg     
 bunx prisma generate --schema prisma/schema-postgres.prisma
 ## akan membuat client di `apps/bakckend/src/generated/prisma-pg` sesuai file `*.prisma`
-# Jika migrasi gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
+# Jika migrasi local gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
 ```
 cara-1-migrasi: Ambil isi file migrations sql di backend yg berisi query "CREATE TABLE...", salin ke LLM, *buat versi postgres* simpan ke file `migrations-pg.sql`
@@ -489,7 +489,7 @@ Tambahkan `seed:pg` ke script `apps/backend/package.json`:
 
 Run Perintah:
 ```sh
-# cara-2-migrasi skema database ke RDS Postgres
+# cara-2-migrasi: skema database ke RDS Postgres
 bun --env-file=.env.production prisma db push --force-reset
 
 # seed ke `dev.db` dan Postgres
@@ -928,7 +928,75 @@ Ubah `dev` dan `dev:turso` ke file `server.ts`.
   - `localhost:3000/auth/login` Harus buka popup Google (Jika dapat `error 400 url_mismatch`, Pastikan `http://localhost:3000/auth/callback` ada di GCC -> API -> Cred -> Client ID -> Tambahkan di list `Authorized redirect URIs`).
 </details>
 
-#### Install, Generate & Build
+#### 2. Buat Lambda function di AWS Console
+Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
+
+**Proses Lambda function Backend Elysia Prisma berikut:**
+<details><summary>Buat Lambda Function</summary>
+
+```sh
+Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
+Lambda → Create function → Author from scratch
+  Function name: monorepo-backend
+  Runtime: Node.js ^24.x  (Latest support, atau pilih Amazon Linux jika ingin "custom" pakai bun layer)
+  Architecture: x86_64
+ -> CREATE
+
+ -> Tab "Configuration" -> Permissions -> Execution role "Edit"
+  Execution role: "Create new role" with basic Lambda permissions
+  → setelah dibuat, attach policy SSM read (dari Admin)
+```
+</details>
+
+<details><summary>Minta admin tambahkan policy ke Role yang baru dibuat</summary>
+
+Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
+```json
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "LambdaAccessSSMKey",
+			"Effect": "Allow",
+			"Action": [
+				"ssm:GetParameters",
+				"ssm:GetParameter",
+				"kms:Decrypt"
+			],
+			"Resource": [
+				"arn:aws:ssm:us-east-1:AWS_ACCOUNT_ID:parameter/monorepo/*"
+			]
+		}
+	]
+}
+```
+Beri nama `additionalPolicy_LambdaBE`
+
+**✨ Tips**: gunakan fitur search resource biar mudah
+</details>
+
+<details><summary>Setep Config Lambda</summary>
+
+```sh
+Lambda → Functions → [nama function]
+  -> tab "Code"
+    -> Runtime Settings -> Edit
+      Handler: lambda.handler
+  
+  -> tab "Configuration" -> Edit
+      Memory: 512 MB (minimum untuk prisma)
+      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
+  
+  → tab Configuration → Function URL → Create function URL
+    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
+    CORS: Disabled (CORS di-handle manual dari kode Elysia)
+
+→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
+→ Kirim URL ini ke Anggota D dan Admin
+```
+</details>
+
+#### 3. Build & Upload ke Backend Lambda
 
 <details><summary>Step Build -> Upload Backend</summary>
 
@@ -966,77 +1034,6 @@ aws lambda update-function-configuration --function-name monorepo-backend --envi
 ```
 Untuk secret mengunakan SSM parameter store reference, BUKAN plaintext di sini
 dynamic load dari SSM sudah di set di config.ts
-</details>
-
-### 2. Buat Lambda function di AWS Console
-Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
-
-**Proses Lambda function Backend Elysia Prisma berikut:**
-<details><summary>Buat Lambda Function</summary>
-
-```sh
-Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
-Lambda → Create function → Author from scratch
-  Function name: monorepo-backend
-  Runtime: Node.js ^24.x  (Latest support, atau pilih Amazon Linux jika ingin "custom" pakai bun layer)
-  Architecture: x86_64
-  
-  Execution role: "Create new role" with basic Lambda permissions
-  → setelah dibuat, attach policy SSM read (dari Admin)
-```
-</details>
-
-<details><summary>Minta admin tambahkan policy ke Role yang baru dibuat</summary>
-
-Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
-```json
-{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Sid": "LambdaAccessSSMKey",
-			"Effect": "Allow",
-			"Action": [
-				"ssm:GetParameters",
-				"ssm:GetParameter",
-				"kms:Decrypt"
-			],
-			"Resource": [
-				"arn:aws:ssm:us-east-1:AWS_ACCOUNT_ID:parameter/monorepo/*"
-			]
-		}
-	]
-}
-```
-Beri nama `additionalPolicy_LambdaBE`
-
-**✨ Tips**: gunakan fitur search resource biar mudah
-</details>
-
-<details><summary>Config  Lambda</summary>
-
-```sh
-Lambda → Functions → [nama function]
-  -> tab "Code"
-    -> Runtime Settings -> Edit
-      Handler: lambda.handler
-  -> tab "Configuration" -> Edit
-      Memory: 512 MB (minimum untuk prisma)
-      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
-```
-</details>
-
-<details><summary>Buat Lambda Function URL</summary>
-
-```sh
-Lambda → Functions -> Masuk ke fungsi yang baru dibuat
-  → tab Configuration → Function URL → Create function URL
-    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
-    CORS: Disabled (CORS di-handle manual dari kode Elysia)
-
-→ Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
-→ Kirim URL ini ke Anggota D dan Admin
-```
 </details>
 
 - ✅ Redirect URI didapatkan ("https://FUNCTION_URL/auth/callback"): minta admin update ke AWS Parameter Store `/monorepo/GOOGLE_REDIRECT_URI` & ke GCC -> API Creds -> select Name di "OAuth 2.0 Client IDs" -> tambahkan url ke Authorized redirect URIs. 
