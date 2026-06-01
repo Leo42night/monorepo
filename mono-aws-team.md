@@ -506,11 +506,75 @@ Gunakan [SQLite3](#sqlite3) Untuk melihat isi `dev.db` & Lihat di HeidiSQL untuk
 Mulai setelah Admin selesai Parameter Store, dan Anggota B update DATABASE_URL
 > Tunggu Anggota B kabari bahwa DATABASE_URL sudah di Parameter Store.
 
-### 1. Build backend Elysia menjadi bundle Lambda
+### 4.1. Buat Lambda function di AWS Console
+Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
+
+**Proses Lambda function Backend Elysia Prisma berikut:**
+<details><summary>Buat Lambda Function</summary>
+
+```sh
+Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
+Lambda → Create function → Author from scratch
+  Function name: monorepo-backend
+  Runtime: Node.js ^24.x  (Latest support, atau pilih Amazon Linux jika ingin "custom" pakai bun layer)
+  Architecture: x86_64
+ -> CREATE
+
+Lambda → Functions → [nama function]
+  -> tab "Code"
+    -> Runtime Settings -> Edit
+      Handler: lambda.handler
+  
+  -> tab "Configuration" -> Edit
+      Memory: 512 MB (minimum untuk prisma)
+      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
+  
+  → tab Configuration → Function URL → Create function URL
+    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
+    CORS: Disabled (CORS di-handle manual dari kode Elysia)
+
+	# Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
+	# Kirim URL ini ke Anggota D dan Admin
+
+  -> Tab "Configuration" -> Permissions -> Execution role "Edit"
+    Execution role: "Create new role" with basic Lambda permissions
+    → setelah dibuat, attach policy SSM read (dari Admin)
+```
+</details>
+
+<details><summary>Minta admin tambahkan policy ke Role yang baru dibuat</summary>
+
+Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
+```json
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "LambdaAccessSSMKey",
+			"Effect": "Allow",
+			"Action": [
+				"ssm:GetParameters",
+				"ssm:GetParameter",
+				"kms:Decrypt"
+			],
+			"Resource": [
+				"arn:aws:ssm:us-east-1:AWS_ACCOUNT_ID:parameter/monorepo/*"
+			]
+		}
+	]
+}
+```
+Beri nama `additionalPolicy_LambdaBE`
+
+**✨ Tips**: gunakan fitur search resource biar mudah
+</details>
+
+
+### 4.2. Build backend Elysia menjadi bundle Lambda
 Lambda Node.js butuh handler function sebagai entry point. Elysia sudah export app, kita bungkus dengan adapter.
 
 **a. Beberapa modifikas file:**
-#### 1.a. prisma/schema-postgres.prisma
+#### 4.2.1. prisma/schema-postgres.prisma
 <details><summary>Skema khusus postgres</summary>
 
 ```
@@ -532,7 +596,7 @@ model User {
 ```
 </details>
 
-#### 1.b. prisma/db.ts
+#### 4.2.2. prisma/db.ts
 <details><summary>Handler Lazy Load & export</summary>
 
 ```ts
@@ -555,7 +619,7 @@ export const getPrisma = () => {
 ```
 </details>
 
-#### 1.c. prisma/dbPostgres.ts
+#### 4.2.3. prisma/dbPostgres.ts
 <details><summary>Inisiasi db khusus RDS Postgres</summary>
 
 ```ts
@@ -594,7 +658,7 @@ export const getPrisma = () => {
 ```
 </details>
 
-#### 1.d. src/config.ts
+#### 4.2.4. src/config.ts
 <details><summary>Berisi SSM loader</summary>
 
 ```ts
@@ -635,7 +699,7 @@ export const loadConfig = async () => {
 ```
 </details>
 
-#### 1.e. src/types.ts
+#### 4.2.5. src/types.ts
 <details><summary>Berisi custom types Prisma Client untuk security</summary>
 
 ```ts
@@ -648,7 +712,7 @@ export interface DbClient {
 ```
 </details>
 
-#### 1.f. src/index.ts
+#### 4.2.6. src/index.ts
 <details><summary>Berisi shared app factory</summary>
 
 Hanya routes & middleware, terima `getPrisma` via DI
@@ -796,7 +860,7 @@ export const createApp = (getPrisma: () => DbClient) => {
 ```
 </details>
 
-#### 1.g. src/server.ts
+#### 4.2.7. src/server.ts
 <details><summary>dev entry point</summary>
 
 Import `prisma` dari `prisma/db` (LibSQL). Tampilkan detail log.
@@ -820,7 +884,7 @@ console.log("🦊 REDIRECT_URI →", process.env.GOOGLE_REDIRECT_URI);
 ```
 </details>
 
-#### 1.h. src/lambda.ts
+#### 4.2.8. src/lambda.ts
 <details><summary>prod entry point</summary>
 
 ```ts
@@ -908,7 +972,7 @@ export const handler = async (event: any) => {
 </details>
 
 
-#### 1.i. package.json
+#### 4.2.9. package.json
 
 <details><summary>Modify Script</summary>
 
@@ -928,70 +992,7 @@ Ubah `dev` dan `dev:turso` ke file `server.ts`.
   - `localhost:3000/auth/login` Harus buka popup Google (Jika dapat `error 400 url_mismatch`, Pastikan `http://localhost:3000/auth/callback` ada di GCC -> API -> Cred -> Client ID -> Tambahkan di list `Authorized redirect URIs`).
 </details>
 
-#### 2. Buat Lambda function di AWS Console
-Buat Function -> Tambah Role -> Upload ZIP konfigurasi env vars & Function URL. 
-
-**Proses Lambda function Backend Elysia Prisma berikut:**
-<details><summary>Buat Lambda Function</summary>
-
-```sh
-Buka Aws Console -> Select region "us-east-1 (N. Virginia)"
-Lambda → Create function → Author from scratch
-  Function name: monorepo-backend
-  Runtime: Node.js ^24.x  (Latest support, atau pilih Amazon Linux jika ingin "custom" pakai bun layer)
-  Architecture: x86_64
- -> CREATE
-
-Lambda → Functions → [nama function]
-  -> tab "Code"
-    -> Runtime Settings -> Edit
-      Handler: lambda.handler
-  
-  -> tab "Configuration" -> Edit
-      Memory: 512 MB (minimum untuk prisma)
-      Timeout: 1 menit (default 3 detik terlalu kecil untuk cold start Prisma)
-  
-  → tab Configuration → Function URL → Create function URL
-    Auth type: NONE  (kita pakai API_KEY manual dari kode Elysia)
-    CORS: Disabled (CORS di-handle manual dari kode Elysia)
-
-	# Salin Function URL yang muncul (format: https://xxxxxxxx.lambda-url.us-east-1.on.aws)
-	# Kirim URL ini ke Anggota D dan Admin
-
-  -> Tab "Configuration" -> Permissions -> Execution role "Edit"
-    Execution role: "Create new role" with basic Lambda permissions
-    → setelah dibuat, attach policy SSM read (dari Admin)
-```
-</details>
-
-<details><summary>Minta admin tambahkan policy ke Role yang baru dibuat</summary>
-
-Biasanya namanya **monorepo-backend-role-xxx**. Supaya Lambda Function dapat akses env vars di SSM.
-```json
-{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Sid": "LambdaAccessSSMKey",
-			"Effect": "Allow",
-			"Action": [
-				"ssm:GetParameters",
-				"ssm:GetParameter",
-				"kms:Decrypt"
-			],
-			"Resource": [
-				"arn:aws:ssm:us-east-1:AWS_ACCOUNT_ID:parameter/monorepo/*"
-			]
-		}
-	]
-}
-```
-Beri nama `additionalPolicy_LambdaBE`
-
-**✨ Tips**: gunakan fitur search resource biar mudah
-</details>
-
-#### 3. Build & Upload ke Backend Lambda
+#### 4.3. Build & Upload ke Backend Lambda
 
 <details><summary>Step Build -> Upload Backend</summary>
 
