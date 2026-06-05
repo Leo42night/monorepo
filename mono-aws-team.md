@@ -447,7 +447,6 @@ bunx prisma generate --schema prisma/schema-postgres.prisma
 # Jika migrasi local gagal, hapus `dev.db` & `migrations/`, run ulang migrasi.
 bunx prisma migrate dev --name init
 ```
-cara-1-migrasi: Ambil isi file migrations sql di backend yg berisi query "CREATE TABLE...", salin ke LLM, *buat versi postgres* simpan ke file `migrations-pg.sql`
 </details>
 
 <details><summary>Step 2: RDS HeidiSQL, Migrate & Seed Postgres</summary>
@@ -467,10 +466,10 @@ Koneksi HeidiSQL ke RDS Postgres (Jika belum ada, Download [Laragon v6.0.0 wamp 
     -> Port `5432`
     -> Database `monorepo_prod`
   -> Rename Sessions: "AWS RDS" -> SIMPAN
+-> Buka Session -> Database `monorepo_prod` (atau `public`) 
 
--> Buka Session -> Database "Public"
--> jalankan query migrasi (cara-1-migrasi) `migrations-pg.sql` di tab "Query" HeidiSQL (pastikan diseleksi database "public").
 ```
+</details>
 
 Masukkan ke `apps/backend/env.production`:
 ```sh
@@ -485,15 +484,14 @@ Tambahkan `seed:pg` ke script `apps/backend/package.json`:
   }
 }
 ```
-</details>
 
 Run Perintah:
 ```sh
-# cara-2-migrasi: skema database ke RDS Postgres
+# migrasi masukkan skema tabel ke Database
 bun --env-file=.env.production prisma db push --force-reset
-
-# seed ke `dev.db` dan Postgres
+# seed ke `dev.db`
 bunx prisma db seed
+# seed ke RDS Postgres
 bun seed:pg
 ```
 
