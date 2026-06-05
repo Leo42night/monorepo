@@ -13,19 +13,17 @@ Brief Project:
   5. IAM Client D (Lambda — Frontend): React static via S3+CloudFront
   6. IAM Client E (Opsional, Integrasi & Dokumentasi): Jembatan semua komponen + laporan akhir
 
-⚠️ **Disclaimer**: tutorial ini di jalankan menggunakan WSL archLinux [wsl paling ringan], jadi mungkin akan ada kendala dependency & cara instalasi bagi yang environment berbeda.
-
 ✨ **Tips:** 
 - Gunakan `US-Virginia (us-east-1)` jika ingin cost paling murah, jadi credit tidak terkuras banyak.
-- Tiap pindah fitur AWS Console, Buka tab baru, agar mudah kembali ke tab sebelumya. 
-- Gunakan Notepad untuk menyimpan key/config yang akan digunakan lagi.
+- Tiap pindah fitur di Web AWS, Buka tab browser baru, agar mudah kembali ke tab sebelumya. 
+- Simpan key/config lagi ke dalam txt file di luar repo, jadi jika pull ulang repo, anda tidak perlu susah setup env vars nya.
 
 ## Install & Login
 
 **AWS CLI**: Dipakai untuk push data kode ke AWS S3
 <details><summary>Step Instalasi AWS </summary>
 
-- Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions)
+- Ikuti [Docs setup AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions), Download sesuai OS
 - [Buat access Key untuk IAM](#buat-access-key-untuk-iam) anda dulu lalu jalankan `aws configure` (contoh di bawah)
 ```sh
 AWS Access Key ID [None]: AKIAZ3MGNLZ3MxxPxxx
