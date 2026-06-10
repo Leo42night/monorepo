@@ -307,7 +307,7 @@ Aurora and RDS → Database → Create database (FUll Configuration)
   DB instance identifier: monorepo-db
   Master username: postgres
   Master password: (jangan pakai simbol !$@"'`, disarankan pakai huruf dan angka saja, simpan baik-baik)
-  DB instance class: db.t3.micro
+  DB instance class: db.t3.micro (jika bermasalah tidak ada pilihan `Instance type`, bisa pakai Create Method `Easy Create`)
   Storage: 20 GiB gp2
   
   Connectivity:
