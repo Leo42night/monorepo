@@ -114,42 +114,8 @@ IAM → Users → Create user
 **Penting:** Admin Root perlu atkifkan `IAM user and role access to Billing information`. Menunya ada di [account setting](https://drive.google.com/file/d/1OGMQqj2ZUSZfcV5p0LDXJlUVU_Uyi0St/view?usp=drive_link).
 
 ### 2. Setup VPC dan Security Group
-Gunakan default **VPC** (Virtual Private Cloud) jika ada, atau buat VPC baru. Yang penting: Security Group untuk RDS hanya terima koneksi dari Lambda.
+Bisa pakai default **VPC** (Virtual Private Cloud). Untuk sekarang dibuat public Agar dapat diakses juga di HeidiSQL (keamanan udh diatur dari password).
 
-**Buat Security Group untuk RDS**
-<details><summary>Step SG RDS Internal (sgRdsInternal)</summary>
-
-```sh
-VPC → Security Groups → Create security group
-  Name: sgRdsInternal
-  Description: RDS Security Group for internal PostgreSQL access from within VPC
-  VPC: (pilih VPC kamu, atau biarkan default)
-  
-  Inbound rules:
-    Type: PostgreSQL (5432)
-    Source: Custom → sgLambda (akan diisi setelah Lambda SG dibuat, untuk sekarang skip dulu)
-  
-  Outbound rules: semua traffic (default)
-```
-</details>
-
-**Buat Security Group untuk Lambda**
-<details><summary>Step SG Lambda</summary>
-
-```sh
-Name: sgLambda
-Desc: Security group for Lambda functions to access RDS and external APIs
-  Inbound: tidak perlu (Lambda dipanggil via URL, bukan VPC ingress)
-  Outbound:
-    Type: PostgreSQL (5432) → Destination: sgRdsInternal
-    Type: HTTPS (443) → Destination: Anywhere-IPv4 (untuk Turso/LibSQL)
-```
-</details>
-
-> [!NOTE] 
-> Setelah `sgLambda` terbentuk, balik ke sgRdsInternal dan edit inbound rule: ubah source dari "Custom" ke sgLambda ID.
-
-**Buat Security untuk Postgres public**
 <details><summary>Step SG Postgre Public (postgrePublic)</summary>
 
 Dipakai untuk migrate database dari local, dan dapat di akses.
@@ -290,7 +256,7 @@ Tugas anda adalah men-setting filter. Screenshoot mencangkup bagian filter yang 
 
 ## Fase 3 — Anggota B: RDS Database
 Mulai setelah Admin selesai VPC & Security Group
-> Tunggu konfirmasi dari Admin bahwa sgRdsInternal dan Parameter Store sudah siap.
+> Tunggu konfirmasi dari Admin bahwa PostgrePublic dan Parameter Store sudah siap.
 
 ### 1. Buat RDS
 Buat RDS PostgreSQL Free Tier (lebih aman dari sisi biaya).
@@ -315,7 +281,6 @@ Aurora and RDS → Database → Create database (FUll Configuration)
     Subnet group: default
 	Public access: Yes (dapat diakses di Local)
     VPC security group: 
-      sgRdsInternal (dari Admin, dapat diakses aws Lambda)
       postgrePublic (dari Admin, agar dapat migrate dari local)  
   
   Additional configuration
