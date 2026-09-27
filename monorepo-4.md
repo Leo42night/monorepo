@@ -343,7 +343,7 @@ Keterangan:
   - `VITE_BACKEND_URL` menyesuaikan backend production di vercel.
 
 ### B.3. **vercel.json**
-Vercel memiliki kendala dalam membaca route uri untuk app react, jadi routes perlu di-konfigurasi eksplisit.
+Config React Router SPA + Vercel, karena file SPA akan selalu mengarah ke index.html.
 ```json
 {
   "routes": [
