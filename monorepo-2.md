@@ -48,12 +48,18 @@ Perhatikan generated file **prisma.config.ts**. ia akan meminta env DATABASE_URL
 
 ## Konfigurasi Prisma
 
-Buat skema, tambahkan beberapa konfig ini komponen `schema.prisma` (jangan sampai double, jangan hapus config yg lain):
+Buat skema, tambahkan beberapa konfig ini komponen `schema.prisma` (jangan sampai double):
 
 ```prisma
 generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
   engineType = "client"
   runtime = "bun"
+}
+
+datasource db {
+  provider = "sqlite"
 }
 
 model User { 
